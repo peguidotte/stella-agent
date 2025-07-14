@@ -1,0 +1,53 @@
+# Configurações do Stella Agent
+# Este arquivo pode ser modificado para personalizar o comportamento do sistema
+
+# Configurações de autenticação (HU-01)
+authentication:
+  pin_length: 6
+  max_pin_attempts: 3
+  lockout_duration_minutes: 30
+  require_name_confirmation: true
+  default_pin: "123456"  # ALTERAR EM PRODUÇÃO
+
+# Configurações de solicitação de retirada (HU-02)
+request:
+  wake_word: "Stella"
+  confirmation_timeout_minutes: 10
+  allow_concurrent_requests: false
+  outlier_detection_enabled: true
+  outlier_threshold_multiplier: 3.0
+
+# Configurações de validação de retirada (HU-03)
+validation:
+  max_face_id_attempts: 3
+  face_id_confidence_threshold: 0.8
+  allow_pin_fallback: true
+
+# Configurações de hardware
+hardware:
+  camera_device_id: 0
+  microphone_device_id: null
+  speaker_device_id: null
+  voice_recognition_language: "pt-BR"
+
+# Configurações do sistema
+system:
+  unit_id: "UNIT_001"
+  log_level: "INFO"
+  data_retention_days: 30
+  session_timeout_minutes: 30
+  
+# Configurações de mensageria
+messaging:
+  queue_name: "stella_notifications"
+  redis_host: "localhost"
+  redis_port: 6379
+  connection_timeout_seconds: 5
+  retry_attempts: 3
+
+# Configurações de desenvolvimento
+development:
+  mock_mode: true
+  debug_voice_commands: true
+  debug_face_recognition: true
+  simulate_hardware: true
