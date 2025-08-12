@@ -41,7 +41,7 @@ stella/
 - Câmera (para Face ID)
 - Microfone (para comandos de voz)
 
-### Instalação das Dependências
+### Instalação das Dependências (Implementar on demand)
 
 ```bash
 pip install -r requirements.txt
@@ -180,7 +180,7 @@ Este projeto faz parte do DASA Challenge. Para contribuir:
 
 1. Mantenha a estrutura modular existente
 2. Siga as especificações das HUs
-3. Adicione testes quando implementar funcionalidades reais
+3. Adicione testes quando implementar funcionalidades reais (não precisamos disso agora)
 4. Documente mudanças significativas
 
 ## 📄 Licença
