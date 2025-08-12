@@ -7,3 +7,7 @@ Este módulo gerencia:
 - Cadastro de novos rostos (durante autenticação inicial)
 - Validação de identidade para retiradas
 """
+
+from .face_recognizer import FaceRecognizer
+
+__all__ = ['FaceRecognizer']
