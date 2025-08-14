@@ -29,7 +29,7 @@ class FaceRecognizer:
             True se câmera foi inicializada com sucesso
         """
         if self._mock_mode:
-            print("🔍 Modo mock ativado, pulando inicialização da câmera.")
+            logger.info("🔍 Modo mock ativado, pulando inicialização da câmera.")
             return True
         
         try:
