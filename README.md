@@ -132,48 +132,6 @@ O sistema envia notificações via fila (Redis) para o Sistema da Unidade:
 }
 ```
 
-## 🛠️ Modo de Desenvolvimento
-
-Por padrão, o sistema roda em modo simulação para facilitar desenvolvimento:
-
-- **Voice**: Entrada via console ao invés de microfone real
-- **Face ID**: Simulação com resultados aleatórios
-- **Messaging**: Logs no console ao invés de fila real
-
-Para habilitar hardware real, configure `development.mock_mode: false` no YAML.
-
-## 📝 Logs e Auditoria
-
-- Logs salvos em `stella.log` com rotação diária
-- Histórico de faces registradas em `face_id/faces_db.json`
-- Configurações persistidas em `config/stella_config.yaml`
-
-## 🔒 Segurança
-
-- PINs podem ser configurados via variável de ambiente `STELLA_UNIT_PIN`
-- Encodings faciais armazenados localmente com hash seguro
-- Sistema de bloqueio automático após tentativas excessivas
-- Timeout de sessão configurável
-
-## 🚨 Troubleshooting
-
-### Problemas Comuns
-
-1. **Câmera não detectada**: Verifique `hardware.camera_device_id`
-2. **Microfone não funcionando**: Ajuste `hardware.microphone_device_id`
-3. **Redis não conecta**: Verifique configurações em `messaging`
-
-### Logs de Debug
-
-Ative debug detalhado configurando:
-```yaml
-system:
-  log_level: "DEBUG"
-development:
-  debug_voice_commands: true
-  debug_face_recognition: true
-```
-
 ## 🤝 Contribuição
 
 Este projeto faz parte do DASA Challenge. Para contribuir:
