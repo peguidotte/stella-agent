@@ -1,0 +1,26 @@
+# ==============================================================================
+# STELLA AGENT - Dependências do Projeto
+# ==============================================================================
+
+# Reconhecimento facial ---------------------------------------
+mediapipe==0.10.21
+# Traz automaticamente: opencv-contrib-python, numpy, pillow, 
+# matplotlib, protobuf, scipy, absl-py, attrs, flatbuffers
+# -------------------------------------------------------------
+
+# Configuração e ambiente -------------------------------------
+python-dotenv==1.1.1           # Variáveis de ambiente (.env)
+pyyaml==6.0.2                  # Arquivos de configuração YAML
+# -------------------------------------------------------------
+
+# Logging -----------------------------------------------------
+loguru==0.7.3                  # Sistema de logging avançado
+# -------------------------------------------------------------
+
+# Desenvolvimento ---------------------------------------------
+pytest==8.4.1                  # Framework de testes
+# -------------------------------------------------------------
+
+# ==============================================================================
+# Para instalar: pip install -r requirements.txt após seguir INSTALLATION_GUIDE
+# ==============================================================================
