@@ -13,7 +13,7 @@ class FaceRecognizer:
         self.camera = None
         self.camera_index = 0  # Índice da câmera (0 para webcam padrão)
         self.camera_active = False
-        self._mock_mode = None  # Para pular o reconhecimento facial
+        self._mock_mode = False  # Para pular o reconhecimento facial
         self.faces_db_path = Path(__file__).parent / "faces_db.json"
         self.face_encodings = self._load_faces_database()
         
