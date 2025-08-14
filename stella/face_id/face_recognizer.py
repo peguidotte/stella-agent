@@ -4,15 +4,16 @@ import numpy as np
 from typing import Optional, List, Any
 from pathlib import Path
 import mediapipe as mp
-
+from loguru import logger
 
 class FaceRecognizer:
     """Gerenciador de reconhecimento facial"""
     
     def __init__(self):
         self.camera = None
+        self.camera_index = 0  # Índice da câmera (0 para webcam padrão)
         self.camera_active = False
-        self._mock_mode = True  # Para pular o reconhecimento facial
+        self._mock_mode = False  # Para pular o reconhecimento facial
         self.faces_db_path = Path(__file__).parent / "faces_db.json"
         self.face_encodings = self._load_faces_database()
         
@@ -27,7 +28,31 @@ class FaceRecognizer:
         Returns:
             True se câmera foi inicializada com sucesso
         """
-        return False
+        if self._mock_mode:
+            logger.info("🔍 Modo mock ativado, pulando inicialização da câmera.")
+            return True
+        
+        try:
+            logger.info(f"Inicializando câmera no índice {self.camera_index}...")
+            self.camera = cv2.VideoCapture(self.camera_index)
+            if self.camera is None or not self.camera.isOpened():
+                logger.error("Não foi possível abrir a câmera.")
+                self.camera_active = False
+                if self.camera is not None:
+                    self.camera.release()
+                return False
+            self.camera_active = True
+            return True
+        except cv2.error as e:
+            logger.error(f"Erro ao abrir câmera: {e}")
+            self.camera_active = False
+            return False
+        except Exception as e:
+            logger.error(f"Erro ao inicializar câmera: {e}")
+            self.camera_active = False
+            return False
+
+         
     
     async def close_camera(self):
         """Fecha a câmera"""
@@ -195,4 +220,6 @@ def test():
 
 if __name__ == "__main__":
     # Executar teste quando o arquivo for chamado diretamente
-    test()
+    recognizer = FaceRecognizer()
+    import asyncio
+    asyncio.run(recognizer.initialize_camera())
