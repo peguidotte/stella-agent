@@ -23,10 +23,10 @@ class FaceRecognizer:
     
     async def initialize_camera(self) -> bool:
         """
-        Inicializa a câmera para captura
+        Initialize camera for face recognition.
         
         Returns:
-            True se câmera foi inicializada com sucesso
+            True if camera initialized successfully, False otherwise
         """
         if self._mock_mode:
             logger.info("🔍 Modo mock ativado, pulando inicialização da câmera.")
@@ -51,76 +51,73 @@ class FaceRecognizer:
             logger.error(f"Erro ao inicializar câmera: {e}")
             self.camera_active = False
             return False
-
-         
     
     async def close_camera(self):
-        """Fecha a câmera"""
-        pass
+        """Closes the camera and windows, releasing resources."""
+        if self.camera is not None:
+            self.camera.release()
+            self.camera = None
+        cv2.destroyAllWindows()
+        self.camera_active = False
     
-    async def capture_and_register_face(self, user_name: str) -> Optional[Any]:
+    async def register_face(self, user_name: str) -> bool:
         """
-        Captura e registra uma nova face no sistema
-        
-        Args:
-            user_name: Nome do usuário para registro
+        Registry a new face for a user
+        Parameters:
+            user_name: Name of the user to register
+        Returns:
+            True if registration was successful, False otherwise
+        """
+        return False
+    
+    async def validate_face(self) -> 'tuple[bool, str]':
+        """
+        Validates the face of the current user
             
         Returns:
-            Face encoding se sucesso, None se falha
-        """
-        pass
-    
-    async def validate_face(self, user_name: str) -> bool:
-        """
-        Valida identidade comparando rosto atual com rosto registrado
-        
-        Args:
-            user_name: Nome do usuário para validação
-            
-        Returns:
-            True se validação foi bem-sucedida
+            True and username if face is recognized, False otherwise
         """
         return False
     
     def is_face_registered(self, user_name: str) -> bool:
         """
-        Verifica se usuário tem rosto registrado
+        Verify if a user has a registered face
         
         Args:
-            user_name: Nome do usuário
+            user_name: Name of the user
             
         Returns:
-            True se tem rosto registrado
+            True if user has a registered face, False otherwise
         """
         return False
 
     def get_registered_users(self) -> List[str]:
         """
-        Retorna lista de usuários com rosto registrado
+        Get a list of all users with registered faces
         
         Returns:
-            Lista de nomes de usuários
+            List of user names with registered faces
         """
         return []
     
     def remove_user_face(self, user_name: str) -> bool:
         """
-        Remove o rosto registrado de um usuário
+        Remove a user's registered face
         
         Args:
-            user_name: Nome do usuário
+            user_name: Name of the user
             
         Returns:
-            True se removido com sucesso
+            True if removal was successful, False otherwise
         """
         return False
     
     def _load_faces_database(self) -> dict:
-        """Carrega banco de dados de rostos do arquivo"""
+        """Loads the face database from file"""
         return {}
     
-    def _save_faces_database(self):
-        """Salva banco de dados de rostos no arquivo"""
+    def _save_faces_database(self) -> bool:
+        """Saves the face database to file"""
         pass
     
     async def capture_frame(self) -> Optional[Any]:
@@ -140,82 +137,6 @@ class FaceRecognizer:
             threshold: Valor entre 0 e 1
         """
         pass
-
-
-def test():
-    """
-    Função de teste simples para verificar instalação e câmera
-    """
-    print("🔍 TESTE DO SISTEMA STELLA AGENT")
-    print("=" * 40)
-    
-    # 1. Testar imports
-    try:
-        print("📦 Testando imports...")
-        print(f"✅ OpenCV: {cv2.__version__}")
-        print(f"✅ MediaPipe: {mp.__version__}")
-        print(f"✅ NumPy: {np.__version__}")
-    except Exception as e:
-        print(f"❌ Erro nos imports: {e}")
-        return False
-    
-    # 2. Testar conexão com câmera
-    try:
-        print("\n📷 Testando câmera...")
-        camera = cv2.VideoCapture(0)
-        
-        if not camera.isOpened():
-            print("❌ Não foi possível abrir a câmera")
-            return False
-        
-        print("✅ Câmera conectada com sucesso!")
-        
-        # Capturar um frame de teste
-        ret, frame = camera.read()
-        if ret:
-            height, width = frame.shape[:2]
-            print(f"✅ Frame capturado: {width}x{height}")
-        else:
-            print("❌ Não foi possível capturar frame")
-            camera.release()
-            return False
-        
-        # Mostrar preview da câmera
-        print("\n🎥 Mostrando preview da câmera...")
-        print("Pressione ESC para fechar")
-        
-        while True:
-            ret, frame = camera.read()
-            if not ret:
-                break
-            
-            # Adicionar texto no frame
-            cv2.putText(frame, "STELLA AGENT - Teste de Camera", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, "Pressione ESC para sair", 
-                       (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            
-            cv2.imshow('Teste da Camera - STELLA AGENT', frame)
-            
-            # ESC para sair
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
-        
-        # Limpar recursos
-        camera.release()
-        cv2.destroyAllWindows()
-        
-        print("✅ Teste da câmera concluído com sucesso!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro ao testar câmera: {e}")
-        try:
-            camera.release()
-            cv2.destroyAllWindows()
-        except:
-            pass
-        return False
 
 
 if __name__ == "__main__":
