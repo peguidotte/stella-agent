@@ -10,14 +10,14 @@
     
 - **Caso de uso proposto**
     1. Estoquista entra no almoxarifado e diz “Stella”
-    2. Stella ativa o modo de escuta e aguarda uma frase relacionada a retirada
+    2. Stella ativa o modo de escuta e aguarda uma frase relacionada a retirada, mas também se prepara para validar faceID no meio da conversa.
     3. Estoquista informa os itens (ex: “preciso de 10 seringas de 10ml”)
     4. Stella:
         - Confere o estoque atual
         - Avalia padrões de retirada anteriores (outliers)
         - Aponta inconsistências se houver (ex: estoque insuficiente ou quantidade atípica)
     5. Stella lê ou mostra os itens para revisão e pergunta: “Deseja confirmar essa retirada agora?”
-    6. Se o estoquista confirmar, inicia-se a **HU-03 - Validação de retirada**
+    6. Se o estoquista confirmar, garante que a **HU-02 - Validação de retirada** esteja completa, se não, valida agora.
     7. Se o estoquista não responder ou não confirmar, Stella entra em modo ocioso por 10 minutos
     8. Caso a confirmação não aconteça dentro desse tempo, o pedido é cancelado e uma notificação é enviada ao Sistema de Unidade
     
@@ -38,7 +38,7 @@
     	 "status": "ERRO",
     	 // requerido
        "date":"timestamp",
-       // requerido
+       // requerido caso de ERRO
        "reason":"Solicitação de retirada não confirmada/ ou qualquer outro erro, validar se é melhor tratar como enums",
        // opcional
        "items":[

@@ -1,11 +1,10 @@
 """
-Face ID Module - Reconhecimento Facial
+Face ID Module
 
-Este módulo gerencia:
-- Captura de imagens da câmera
-- Processamento e reconhecimento facial
-- Cadastro de novos rostos (durante autenticação inicial)
-- Validação de identidade para retiradas
+This module manages:
+- Facial processing and recognition
+- New user registration
+- Face validation
 """
 
 from .face_recognizer import FaceRecognizer
