@@ -62,7 +62,7 @@ class FaceRecognizer:
     
     async def register_face(self, user_name: str) -> bool:
         """
-        Registry a new face for a user
+        Register a new face for a user
         Parameters:
             user_name: Name of the user to register
         Returns:
