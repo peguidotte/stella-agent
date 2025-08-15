@@ -77,7 +77,7 @@ class FaceRecognizer:
         Returns:
             True and username if face is recognized, False otherwise
         """
-        return False
+        return (False, "")
     
     def is_face_registered(self, user_name: str) -> bool:
         """
