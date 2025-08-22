@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from loguru import logger
 
-logger.log("Iniciando o carregamento da chave API do Gemini...")
+logger.info("Iniciando o carregamento da chave API do Gemini...")
 load_dotenv("GEMINI_API_KEY.env")
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
