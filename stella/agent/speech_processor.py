@@ -11,7 +11,7 @@ if not api_key:
     logger.error("GEMINI_API_KEY não encontrada.")
     logger.warning("Verifique se existe o arquivo 'GEMINI_API_KEY.env' no raiz do projeto.")
     logger.warning("Certifique-se de que a variável 'GEMINI_API_KEY' está definida no arquivo")
-    raise ValueError
+    raise ValueError("GEMINI_API_KEY not found in environment variables. Please check that 'GEMINI_API_KEY.env' exists in the project root and contains the 'GEMINI_API_KEY' variable.")
 logger.success("GEMINI_API_KEY carregada com sucesso.")
 genai.configure(api_key=api_key)
 
