@@ -1,0 +1,101 @@
+{
+  "estoque": {
+    "seringa_5ml": {
+      "nome_completo": "Seringa descartável 5ml",
+      "categoria": "material_descartavel",
+      "quantidade_atual": 150,
+      "quantidade_minima": 50,
+      "quantidade_critica": 20,
+      "outlier_maximo": 30,
+      "outlier_minimo": 1,
+      "localizacao": {
+        "setor": "A",
+        "prateleira": "3",
+        "gaveta": "B"
+      },
+      "historico_medio_diario": 12,
+      "unidade": "unidade"
+    },
+    "seringa_10ml": {
+      "nome_completo": "Seringa descartável 10ml",
+      "categoria": "material_descartavel",
+      "quantidade_atual": 200,
+      "quantidade_minima": 80,
+      "quantidade_critica": 30,
+      "outlier_maximo": 40,
+      "outlier_minimo": 1,
+      "localizacao": {
+        "setor": "A",
+        "prateleira": "3",
+        "gaveta": "C"
+      },
+      "historico_medio_diario": 18,
+      "unidade": "unidade"
+    },
+    "luva": {
+      "nome_completo": "Luva de procedimento descartável",
+      "categoria": "epi",
+      "quantidade_atual": 500,
+      "quantidade_minima": 100,
+      "quantidade_critica": 30,
+      "outlier_maximo": 50,
+      "outlier_minimo": 5,
+      "localizacao": {
+        "setor": "B",
+        "prateleira": "1",
+        "gaveta": "A"
+      },
+      "historico_medio_diario": 45,
+      "unidade": "par"
+    },
+    "mascara_n95": {
+      "nome_completo": "Máscara N95 respiratória",
+      "categoria": "epi",
+      "quantidade_atual": 25,
+      "quantidade_minima": 50,
+      "quantidade_critica": 10,
+      "outlier_maximo": 15,
+      "outlier_minimo": 1,
+      "localizacao": {
+        "setor": "C",
+        "prateleira": "2",
+        "gaveta": "C"
+      },
+      "historico_medio_diario": 8,
+      "unidade": "unidade"
+    },
+    "agulha_21g": {
+      "nome_completo": "Agulha descartável 21G",
+      "categoria": "material_descartavel",
+      "quantidade_atual": 300,
+      "quantidade_minima": 100,
+      "quantidade_critica": 40,
+      "outlier_maximo": 50,
+      "outlier_minimo": 1,
+      "localizacao": {
+        "setor": "A",
+        "prateleira": "2",
+        "gaveta": "A"
+      },
+      "historico_medio_diario": 25,
+      "unidade": "unidade"
+    },
+    "gaze": {
+      "nome_completo": "Gaze estéril 7.5x7.5cm",
+      "categoria": "material_curativo",
+      "quantidade_atual": 80,
+      "quantidade_minima": 60,
+      "quantidade_critica": 20,
+      "outlier_maximo": 30,
+      "outlier_minimo": 2,
+      "localizacao": {
+        "setor": "D",
+        "prateleira": "1",
+        "gaveta": "B"
+      },
+      "historico_medio_diario": 15,
+      "unidade": "pacote"
+    }
+  },
+  "ultima_atualizacao": "2025-08-21T10:30:00Z"
+}

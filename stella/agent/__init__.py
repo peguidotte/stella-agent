@@ -1,5 +1,5 @@
 """
-Voice Module - Processamento de Voz e Comando
+Agent Module - Processamento de Voz e Comando
 
 Este módulo é responsável por:
 - Detecção da palavra de ativação "Stella"

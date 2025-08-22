@@ -28,7 +28,7 @@ hardware:
   camera_device_id: 0
   microphone_device_id: null
   speaker_device_id: null
-  voice_recognition_language: "pt-BR"
+  agent_recognition_language: "pt-BR"
 
 # Configurações do sistema
 system:
@@ -48,6 +48,6 @@ messaging:
 # Configurações de desenvolvimento
 development:
   mock_mode: true
-  debug_voice_commands: true
+  debug_agent_commands: true
   debug_face_recognition: true
   simulate_hardware: true
