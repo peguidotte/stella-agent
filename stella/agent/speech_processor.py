@@ -155,7 +155,7 @@ def command_interpreter(comando):
     FORMATO DE SAÍDA: Apenas o JSON, sem markdown ou explicações adicionais.
     """
     response = model.generate_content(prompt)
-    print(f"Resposta bruta do Gemini: {response.text}")  # Depuração
+    logger.debug(f"Resposta bruta do Gemini: {response.text}")  # Depuração
     try:
         # Extrai o conteúdo entre ```json
         import re
