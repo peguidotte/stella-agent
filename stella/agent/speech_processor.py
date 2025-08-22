@@ -1,5 +1,6 @@
 import json
 import os
+import requests
 from dotenv import load_dotenv
 import google.generativeai as genai
 from loguru import logger
@@ -14,6 +15,41 @@ if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables. Please check that 'GEMINI_API_KEY.env' exists in the project root and contains the 'GEMINI_API_KEY' variable.")
 logger.success("GEMINI_API_KEY carregada com sucesso.")
 genai.configure(api_key=api_key)
+
+def get_command_from_api(endpoint="comand"):
+    """
+    Busca comandos da API mock
+    
+    Args:
+        endpoint: Endpoint específico da API
+        
+    Returns:
+        Comando processado ou None em caso de falha
+    """
+    api_url = f"https://68a89e1bb115e67576e966a1.mockapi.io/api/stella/agent/{endpoint}"
+    try:
+        logger.info(f"Buscando comando da API: {api_url}")
+        response = requests.get(api_url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            logger.success(f"Comando recebido da API: {data}")
+            
+            if isinstance(data, list) and len(data) > 0:
+                # Se a API retornar uma lista, pega o primeiro item
+                data = data[0]
+                
+            if 'comando' in data:
+                return data['comando'].lower()
+            else:
+                logger.error("Resposta da API não contém a chave 'comando'")
+        else:
+            logger.error(f"Falha ao acessar API. Status code: {response.status_code}")
+        
+        return None
+    except requests.RequestException as e:
+        logger.error(f"Erro ao acessar a API: {e}")
+        return None
 
 def read_json(arquivo):
     try:
@@ -206,13 +242,28 @@ def process_action(resultado):
     
     return confirmacao
 
-comando = read_json('stella/agent/falas.json')
-if comando:
-    print(f"Comando: {comando}\n")
-    resultado = command_interpreter(comando)
-    if resultado:
-        resposta = process_action(resultado)
+# Modificando o fluxo principal para usar a API com fallback para arquivo local
+def get_command():
+    """Obtém comando da API ou do arquivo local como fallback"""
+    # Tenta obter o comando da API primeiro
+    comando = get_command_from_api()
+    
+    # Se falhar, tenta o arquivo local como fallback
+    if comando is None:
+        logger.info("Fallback: tentando ler comando do arquivo local")
+        comando = read_json('stella/agent/falas.json')
+    
+    return comando
+
+# Novo fluxo principal
+if __name__ == "__main__":
+    comando = get_command()
+    if comando:
+        print(f"Comando: {comando}\n")
+        resultado = command_interpreter(comando)
+        if resultado:
+            resposta = process_action(resultado)
+        else:
+            print("Comando não entendido. Tente reformular.")
     else:
-        print("Comando não entendido. Tente reformular.")
-else:
-    print("Nenhum comando válido para processar.")
+        print("Nenhum comando válido para processar.")

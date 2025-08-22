@@ -26,6 +26,7 @@ transformers                    # Para zero-shot e NER (versão mais recente)
 torch                          # Backend para transformers (versão mais recente)
 spacy                          # Suporte híbrido para NLP em português
 google-generativeai            # API para geração de texto
+requests                       # Para fazer requisições HTTP
 # -------------------------------------------------------------
 
 # ==============================================================================
