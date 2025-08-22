@@ -10,7 +10,7 @@ Sistema de IA para gerenciamento de almoxarifado com:
 import asyncio
 
 from stella.core.session_manager import SessionManager
-from stella.voice.speech_processor import SpeechProcessor
+from stella.agent.speech_processor import SpeechProcessor
 from stella.face_id.face_recognizer import FaceRecognizer
 from stella.messaging.unit_system_client import UnitSystemClient
 from stella.config.settings import Settings

@@ -17,7 +17,7 @@ stella/
 ├── core/              # Lógica de fluxo principal
 │   ├── __init__.py
 │   └── session_manager.py
-├── voice/             # Processamento de voz e comandos
+├── agent/             # Processamento de voz e comandos
 │   ├── __init__.py
 │   └── speech_processor.py
 ├── face_id/           # Reconhecimento facial
