@@ -1,0 +1,112 @@
+{
+  "topic": "respostas_stella",
+  "updated_at": "2025-08-22T21:43:14.837597",
+  "message_count": 8,
+  "messages": [
+    {
+      "id": "1755909725533",
+      "timestamp": "2025-08-22T21:42:05.533639",
+      "content": {
+        "timestamp": "2025-08-22T21:42:05.532375",
+        "resposta": {
+          "intencao": "registrar_retirada",
+          "itens": [
+            {
+              "item": "seringa_10ml",
+              "quantidade": 5
+            }
+          ],
+          "confirmacao": "Ok! Registrei a retirada de 5 seringas de 10ml.  Precisa de mais alguma coisa?"
+        }
+      }
+    },
+    {
+      "id": "1755909726390",
+      "timestamp": "2025-08-22T21:42:06.390011",
+      "content": {
+        "timestamp": "2025-08-22T21:42:06.383251",
+        "resposta": {
+          "intencao": "consultar_estoque",
+          "itens": [
+            {
+              "item": "luva"
+            }
+          ],
+          "confirmacao": "Olá!  Preciso verificar a quantidade de luvas em estoque para você. Um momento, por favor..."
+        }
+      }
+    },
+    {
+      "id": "1755909727226",
+      "timestamp": "2025-08-22T21:42:07.226761",
+      "content": {
+        "timestamp": "2025-08-22T21:42:07.225387",
+        "resposta": {
+          "intencao": "registrar_retirada",
+          "itens": [
+            {
+              "item": "gaze",
+              "quantidade": 3
+            }
+          ],
+          "confirmacao": "Ok! Registrei a retirada de 3 caixas de gaze estéril.  Precisa de mais alguma coisa?"
+        }
+      }
+    },
+    {
+      "id": "1755909793789",
+      "timestamp": "2025-08-22T21:43:13.789132",
+      "content": {
+        "timestamp": "2025-08-22T21:43:13.788439",
+        "resposta": {
+          "intencao": "nao_entendido",
+          "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
+        }
+      }
+    },
+    {
+      "id": "1755909793988",
+      "timestamp": "2025-08-22T21:43:13.988301",
+      "content": {
+        "timestamp": "2025-08-22T21:43:13.986764",
+        "resposta": {
+          "intencao": "nao_entendido",
+          "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
+        }
+      }
+    },
+    {
+      "id": "1755909794217",
+      "timestamp": "2025-08-22T21:43:14.217993",
+      "content": {
+        "timestamp": "2025-08-22T21:43:14.216511",
+        "resposta": {
+          "intencao": "nao_entendido",
+          "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
+        }
+      }
+    },
+    {
+      "id": "1755909794430",
+      "timestamp": "2025-08-22T21:43:14.430618",
+      "content": {
+        "timestamp": "2025-08-22T21:43:14.429677",
+        "resposta": {
+          "intencao": "nao_entendido",
+          "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
+        }
+      }
+    },
+    {
+      "id": "1755909794837",
+      "timestamp": "2025-08-22T21:43:14.837575",
+      "content": {
+        "timestamp": "2025-08-22T21:43:14.835127",
+        "resposta": {
+          "intencao": "nao_entendido",
+          "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
+        }
+      }
+    }
+  ]
+}
