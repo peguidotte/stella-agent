@@ -58,11 +58,7 @@ class RabbitMQAdapter:
             logger.info("✅ RabbitMQ real detectado e disponível")
             return True
             
-        except ImportError:
-            logger.warning("📦 Biblioteca 'pika' não instalada - usando mock")
-            return False
-        except Exception as e:
-            logger.warning(f"🔌 RabbitMQ real não disponível ({e}) - usando mock")
+            logger.warning(f"🔌 RabbitMQ real não disponível ({type(e).__name__}: {e}) - usando mock")
             return False
     
     def _initialize_client(self, use_real, **kwargs):
