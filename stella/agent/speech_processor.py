@@ -18,13 +18,25 @@ except ImportError:
         mock_rabbitmq = None
 
 logger.info("Iniciando o carregamento da chave API do Gemini...")
-load_dotenv("GEMINI_API_KEY.env")
-api_key = os.getenv("GEMINI_API_KEY")
+
+# Tenta carregar do diretório atual e depois do diretório pai
+env_paths = ["GEMINI_API_KEY.env", "../GEMINI_API_KEY.env", "../../GEMINI_API_KEY.env"]
+api_key = None
+
+for env_path in env_paths:
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            logger.info(f"GEMINI_API_KEY carregada de: {env_path}")
+            break
+
 if not api_key:
     logger.error("GEMINI_API_KEY não encontrada.")
     logger.warning("Verifique se existe o arquivo 'GEMINI_API_KEY.env' no raiz do projeto.")
     logger.warning("Certifique-se de que a variável 'GEMINI_API_KEY' está definida no arquivo")
     raise ValueError("GEMINI_API_KEY not found in environment variables. Please check that 'GEMINI_API_KEY.env' exists in the project root and contains the 'GEMINI_API_KEY' variable.")
+
 logger.success("GEMINI_API_KEY carregada com sucesso.")
 genai.configure(api_key=api_key)
 
@@ -34,10 +46,23 @@ genai.configure(api_key=api_key)
 
 def load_estoque_data():
     try:
-        with open('data/estoque_almoxarifado.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logger.error("Arquivo de estoque não encontrado")
+        # Tenta diferentes caminhos para o arquivo de estoque
+        estoque_paths = [
+            'data/estoque_almoxarifado.json', 
+            '../data/estoque_almoxarifado.json',
+            '../../data/estoque_almoxarifado.json'
+        ]
+        
+        for path in estoque_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        
+        # Se não encontrou o arquivo, retorna dados de exemplo
+        logger.warning("Arquivo de estoque não encontrado, usando dados de exemplo")
+        return {"estoque": {}}
+    except Exception as e:
+        logger.error(f"Erro ao carregar dados do estoque: {e}")
         return {"estoque": {}}
 
 def command_interpreter(comando):
@@ -74,6 +99,7 @@ IMPORTANTE:
 - Normalize nomes (ex: "seringa 10ml" → "seringa_10ml")
 - Retorne APENAS JSON válido
 - Seja natural e amigável
+- Não assuma um produto em caso de ambiguidade/dúvida, exemplo caso um usúario solicite retirar uma seringa sem especificar o tipo, não assuma seringa_10ml ou seringa_5ml, pergunte qual tipo de seringa ele deseja antes.
 - Se o item não existir no estoque, use intenção "nao_entendido"
 
 RESPONDA APENAS COM JSON:

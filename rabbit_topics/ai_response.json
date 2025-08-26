@@ -1,0 +1,18 @@
+{
+  "topic": "ai_response",
+  "updated_at": "2025-08-25T20:05:40.296242",
+  "message_count": 1,
+  "messages": [
+    {
+      "id": "1756163140296",
+      "timestamp": "2025-08-25T20:05:40.296242",
+      "content": {
+        "conversation_id": "test_session",
+        "user_name": "Dr. Silva",
+        "response": "De nada! Foi um prazer ajudar. Se precisar de mais alguma coisa, estarei aqui!",
+        "timestamp": "2025-08-25T20:05:40.289694",
+        "message_count": 16
+      }
+    }
+  ]
+}
