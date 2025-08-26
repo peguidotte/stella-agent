@@ -21,11 +21,16 @@ loguru==0.7.3                  # Sistema de logging avançado
 pytest==8.4.1                  # Framework de testes
 # -------------------------------------------------------------
 
+# RabbitMQ Real (Messaging) -----------------------------------
+pika==1.3.2                    # Cliente oficial RabbitMQ para Python
+# -------------------------------------------------------------
+
 # Processamento de Linguagem Natural (NLP) --------------------
 transformers                    # Para zero-shot e NER (versão mais recente)
 torch                          # Backend para transformers (versão mais recente)
 spacy                          # Suporte híbrido para NLP em português
 google-generativeai            # API para geração de texto
+requests                       # Para fazer requisições HTTP
 # -------------------------------------------------------------
 
 # ==============================================================================

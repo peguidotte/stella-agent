@@ -80,6 +80,22 @@
       "historico_medio_diario": 25,
       "unidade": "unidade"
     },
+    "agulha_10g": {
+      "nome_completo": "Agulha descartável 10G",
+      "categoria": "material_descartavel",
+      "quantidade_atual": 250,
+      "quantidade_minima": 100,
+      "quantidade_critica": 40,
+      "outlier_maximo": 50,
+      "outlier_minimo": 1,
+      "localizacao": {
+        "setor": "A",
+        "prateleira": "2",
+        "gaveta": "B"
+      },
+      "historico_medio_diario": 20,
+      "unidade": "unidade"
+    },
     "gaze": {
       "nome_completo": "Gaze estéril 7.5x7.5cm",
       "categoria": "material_curativo",

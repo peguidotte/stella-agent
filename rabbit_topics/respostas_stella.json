@@ -1,0 +1,57 @@
+{
+  "topic": "respostas_stella",
+  "updated_at": "2025-08-25T19:16:27.744452",
+  "message_count": 3,
+  "messages": [
+    {
+      "id": "1756160186156",
+      "timestamp": "2025-08-25T19:16:26.156001",
+      "content": {
+        "timestamp": "2025-08-25T19:16:26.147961",
+        "resposta": {
+          "intencao": "registrar_retirada",
+          "itens": [
+            {
+              "item": "seringa_10ml",
+              "quantidade": 5
+            }
+          ],
+          "confirmacao": "Ok! Registrei a retirada de 5 seringas de 10ml.  Precisa de mais alguma coisa?"
+        }
+      }
+    },
+    {
+      "id": "1756160186943",
+      "timestamp": "2025-08-25T19:16:26.943893",
+      "content": {
+        "timestamp": "2025-08-25T19:16:26.935887",
+        "resposta": {
+          "intencao": "consultar_estoque",
+          "itens": [
+            {
+              "item": "luva"
+            }
+          ],
+          "confirmacao": "Olá!  Preciso de mais informações para te ajudar.  Você quer saber a quantidade de luvas que temos em estoque? Aguardo sua confirmação."
+        }
+      }
+    },
+    {
+      "id": "1756160187744",
+      "timestamp": "2025-08-25T19:16:27.744452",
+      "content": {
+        "timestamp": "2025-08-25T19:16:27.736855",
+        "resposta": {
+          "intencao": "registrar_retirada",
+          "itens": [
+            {
+              "item": "gaze",
+              "quantidade": 3
+            }
+          ],
+          "confirmacao": "Ok! Registrei a retirada de 3 caixas de gaze estéril.  Precisa de mais alguma coisa?"
+        }
+      }
+    }
+  ]
+}
