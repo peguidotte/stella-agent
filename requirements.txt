@@ -3,9 +3,9 @@
 # ==============================================================================
 
 # Reconhecimento facial ---------------------------------------
-mediapipe==0.10.21
-# Traz automaticamente: opencv-contrib-python, numpy, pillow, 
-# matplotlib, protobuf, scipy, absl-py, attrs, flatbuffers
+deepface==0.0.92               # Reconhecimento facial (compatível Windows)
+opencv-python>=4.5.0,<5.0.0    # Processamento de imagem
+tf_keras==2.19.0               # Interface Keras para TensorFlow
 # -------------------------------------------------------------
 
 # Configuração e ambiente -------------------------------------
@@ -26,10 +26,16 @@ pika==1.3.2                    # Cliente oficial RabbitMQ para Python
 # -------------------------------------------------------------
 
 # Processamento de Linguagem Natural (NLP) --------------------
-transformers                    # Para zero-shot e NER (versão mais recente)
+google-generativeai>=0.8.0     # API Gemini
+spacy>=3.7.0                   # Suporte híbrido para NLP em português
+# -------------------------------------------------------------
+
+# Dependências fixas para compatibilidade ---------------------
+numpy>=1.21.0,<2.0.0          # Compatível com DeepFace e Gemini
+protobuf>=4.25.3,<5.0.0       # Compatível com ambos
+tensorflow>=2.15.0            # Backend para DeepFace
+transformers                   # Para zero-shot e NER (versão mais recente)
 torch                          # Backend para transformers (versão mais recente)
-spacy                          # Suporte híbrido para NLP em português
-google-generativeai            # API para geração de texto
 requests                       # Para fazer requisições HTTP
 # -------------------------------------------------------------
 
