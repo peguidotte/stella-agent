@@ -223,7 +223,7 @@ class RealRabbitMQ:
                     # Chama callback
                     callback(message)
                     
-                    # Acknowledg
+                    # Acknowledge
                     ch.basic_ack(delivery_tag=method.delivery_tag)
                     
                 except Exception as e:
