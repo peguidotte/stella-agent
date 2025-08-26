@@ -21,6 +21,10 @@ loguru==0.7.3                  # Sistema de logging avançado
 pytest==8.4.1                  # Framework de testes
 # -------------------------------------------------------------
 
+# RabbitMQ Real (Messaging) -----------------------------------
+pika==1.3.2                    # Cliente oficial RabbitMQ para Python
+# -------------------------------------------------------------
+
 # Processamento de Linguagem Natural (NLP) --------------------
 google-generativeai>=0.8.0     # API Gemini
 spacy>=3.7.0                   # Suporte híbrido para NLP em português
@@ -30,6 +34,9 @@ spacy>=3.7.0                   # Suporte híbrido para NLP em português
 numpy>=1.21.0,<2.0.0          # Compatível com DeepFace e Gemini
 protobuf>=4.25.3,<5.0.0       # Compatível com ambos
 tensorflow>=2.15.0            # Backend para DeepFace
+transformers                   # Para zero-shot e NER (versão mais recente)
+torch                          # Backend para transformers (versão mais recente)
+requests                       # Para fazer requisições HTTP
 # -------------------------------------------------------------
 
 # ==============================================================================

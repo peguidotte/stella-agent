@@ -1,185 +1,202 @@
 import json
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 from loguru import logger
 
+# Corrigindo a importação - mudando de relativa para absoluta
+try:
+    from stella.agent.mock_rabbitmq import mock_rabbitmq
+except ImportError:
+    # Fallback para importação direta quando executado como script
+    try:
+        from mock_rabbitmq import mock_rabbitmq
+        logger.info("Mock RabbitMQ importado localmente")
+    except ImportError:
+        logger.error("Não foi possível importar mock_rabbitmq")
+        mock_rabbitmq = None
+
 logger.info("Iniciando o carregamento da chave API do Gemini...")
-load_dotenv("GEMINI_API_KEY.env")
-api_key = os.getenv("GEMINI_API_KEY")
+
+# Tenta carregar do diretório atual e depois do diretório pai
+env_paths = ["GEMINI_API_KEY.env", "../GEMINI_API_KEY.env", "../../GEMINI_API_KEY.env"]
+api_key = None
+
+for env_path in env_paths:
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            logger.info(f"GEMINI_API_KEY carregada de: {env_path}")
+            break
+
 if not api_key:
     logger.error("GEMINI_API_KEY não encontrada.")
     logger.warning("Verifique se existe o arquivo 'GEMINI_API_KEY.env' no raiz do projeto.")
     logger.warning("Certifique-se de que a variável 'GEMINI_API_KEY' está definida no arquivo")
     raise ValueError("GEMINI_API_KEY not found in environment variables. Please check that 'GEMINI_API_KEY.env' exists in the project root and contains the 'GEMINI_API_KEY' variable.")
+
 logger.success("GEMINI_API_KEY carregada com sucesso.")
 genai.configure(api_key=api_key)
 
-def read_json(arquivo):
-    try:
-        with open(arquivo, 'r') as f:
-            data = json.load(f)
-        if 'comando' not in data:
-            logger.error(f"Arquivo {arquivo} não contém a chave 'comando'.")
-            return None
-        return data['comando'].lower()
-    except FileNotFoundError:
-        logger.error(f"Arquivo {arquivo} não encontrado.")
-        return None
-    except KeyError:
-        logger.error("Formato de JSON inválido.")
-        return None
+# Funções de fallback removidas - usando apenas RabbitMQ
+# def get_command_from_api(endpoint="comand"): - REMOVIDA
+# def read_json(arquivo): - REMOVIDA
 
 def load_estoque_data():
     try:
-        with open('data/estoque_almoxarifado.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logger.error("Arquivo de estoque não encontrado")
+        # Tenta diferentes caminhos para o arquivo de estoque
+        estoque_paths = [
+            'data/estoque_almoxarifado.json', 
+            '../data/estoque_almoxarifado.json',
+            '../../data/estoque_almoxarifado.json'
+        ]
+        
+        for path in estoque_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        
+        # Se não encontrou o arquivo, retorna dados de exemplo
+        logger.warning("Arquivo de estoque não encontrado, usando dados de exemplo")
+        return {"estoque": {}}
+    except Exception as e:
+        logger.error(f"Erro ao carregar dados do estoque: {e}")
         return {"estoque": {}}
 
 def command_interpreter(comando):
     model = genai.GenerativeModel('gemini-1.5-flash')
     estoque_data = load_estoque_data()
     
-    # Cria contexto de estoque para a IA
-    contexto_estoque = ""
-    for item_key, item_info in estoque_data.get('estoque', {}).items():
-        contexto_estoque += f"""
-{item_key}: 
-- Disponível: {item_info['quantidade_atual']} {item_info['unidade']}
-- Mínimo: {item_info['quantidade_minima']}
-- Crítico: {item_info['quantidade_critica']}
-- Outlier máx: {item_info['outlier_maximo']}
-- Localização: Setor {item_info['localizacao']['setor']}, Prateleira {item_info['localizacao']['prateleira']}
-"""
+    # Cria contexto de estoque simplificado
+    itens_disponiveis = list(estoque_data.get('estoque', {}).keys())
     
     prompt = f"""
-    Você é a Stella, uma assistente de registro de almoxarifado hospitalar. Analise o comando: '{comando}'
+Você é Stella, assistente de almoxarifado hospitalar. Analise este comando: "{comando}"
 
-    ESTOQUE ATUAL:
-    {contexto_estoque}
+ITENS DISPONÍVEIS NO ESTOQUE:
+{', '.join(itens_disponiveis)}
 
-    CONTEXTO: Estoquistas vêm ao almoxarifado, pegam itens e informam você sobre a retirada. Seu papel é registrar essas movimentações no sistema.
+IDENTIFIQUE A INTENÇÃO:
 
-    IDENTIFIQUE A INTENÇÃO e extraia informações estruturadas:
+1. RETIRADA DE ITEM: "preciso", "quero", "peguei", "retirar"
+   Retorne: {{"intencao": "registrar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "confirmacao": "Texto natural"}}
 
-    ## 1. REGISTRO DE RETIRADA DE ITEM(S)
-    Palavras-chave: "preciso", "quero", "retirar", "pegar", "buscar", "tirei", "peguei"
-    - Verifique se há estoque suficiente
-    - Se quantidade solicitada > outlier_maximo, marque como "outlier": true
-    - Se estoque < quantidade_critica após retirada, marque como "alerta_critico": true
-    - Se múltiplos itens, liste todos
-    - Normalize nomes (ex: "seringa 5ml" → "seringa_5ml")
+2. CONSULTA ESTOQUE: "quanto tem", "quantos", "estoque"  
+   Retorne: {{"intencao": "consultar_estoque", "itens": [{{"item": "nome_item"}}], "confirmacao": "Texto natural"}}
 
-    Retorne APENAS:
-    ```json
-    {{
-    "intencao": "registrar_retirada",
-    "itens": [
-        {{
-            "item": "nome_normalizado", 
-            "quantidade": numero, 
-            "especificacao": "detalhes_opcionais",
-            "estoque_atual": numero,
-            "estoque_apos_retirada": numero,
-            "outlier": boolean,
-            "nivel_alerta": enum(0, 1, 2)  # 0: Normal, 1: Atenção, 2: Crítico,
-            "localizacao": "Setor X, Prateleira Y" #OPCIONAL, APENAS SE HOUVER A INFORMAÇÃO
-        }}
-    ],
-    "confirmacao": "Sua frase natural de confirmação"
-    }}
-    ```
+3. CANCELAR: "cancelar", "desistir"
+   Retorne: {{"intencao": "cancelar_registro", "confirmacao": "Texto natural"}}
 
-    ## 2. CANCELAR REGISTRO
-    Palavras-chave: "cancelar", "desistir", "não quero mais", "errei"
-    ```json
-    {{
-    "intencao": "cancelar_registro",
-    "itens": [
-        {{"item": "nome_normalizado", "quantidade": numero}}
-    ],
-    "confirmacao": "Entendi, vou cancelar o registro da retirada. Confirma?"
-    }}
-    ```
+4. DÚVIDAS: perguntas sobre localização
+   Retorne: {{"intencao": "responder_duvida", "confirmacao": "Texto natural"}}
 
-    ## 3. CONSULTAR ESTOQUE
-    Palavras-chave: "quanto tem", "quantos", "estoque", "disponível", "sobrou"
-    ```json
-    {{
-    "intencao": "consultar_estoque",
-    "itens": [
-        {{
-            "item": "nome_normalizado",
-            "quantidade_atual": numero,
-            "quantidade_minima": numero,
-            "nivel_alerta": enum(0, 1, 2),  # 0: Normal, 1: Atenção, 2: Crítico
-            "localizacao": "Setor X, Prateleira Y" #OPCIONAL, APENAS SE HOUVER A INFORMAÇÃO
-        }}
-    ],
-    "confirmacao": "Temos [quantidade] [item] disponíveis. Localização: [setor/prateleira]"
-    }}
-    ```
+5. NÃO ENTENDIDO: qualquer outra coisa
+   Retorne: {{"intencao": "nao_entendido", "confirmacao": "Não entendi. Pode reformular?"}}
 
-    ## 4. DÚVIDAS SOBRE ALMOXARIFADO
-    Responda apenas sobre: localização de itens, procedimentos, equipamentos médicos
-    ```json
-    {{
-    "intencao": "responder_duvida",
-    "duvida": "pergunta_original",
-    "resposta": "sua_resposta_breve",
-    "confirmacao": "Consegui esclarecer? Precisa de mais alguma informação?"
-    }}
-    ```
+IMPORTANTE:
+- Normalize nomes (ex: "seringa 10ml" → "seringa_10ml")
+- Retorne APENAS JSON válido
+- Seja natural e amigável
+- Não assuma um produto em caso de ambiguidade/dúvida, exemplo caso um usúario solicite retirar uma seringa sem especificar o tipo, não assuma seringa_10ml ou seringa_5ml, pergunte qual tipo de seringa ele deseja antes.
+- Se o item não existir no estoque, use intenção "nao_entendido"
 
-    ## 5. COMANDO UNCLEAR OU FORA DO ESCOPO
-    ```json
-    {{
-    "intencao": "nao_entendido",
-    "confirmacao": "Não consegui entender. Você está informando uma retirada? Ex: 'Peguei 5 seringas de 10ml'"
-    }}
-    ```
-
-    REGRAS:
-    - SEMPRE retorne JSON válido
-    - Normalize itens médicos para padrão consistente
-    - Se comando ambíguo, peça esclarecimento
-    - Ignore conversas não relacionadas ao almoxarifado
-    - Para múltiplos itens, processe cada um separadamente no array
-    - As frases de confirmação são APENAS EXEMPLOS - crie frases naturais e conversacionais
-    - Use tom profissional mas amigável, como uma assistente de registro eficiente
-    - Foque em CONFIRMAR a retirada para depois registrar no sistema
-    - Varie as confirmações para soar natural
-
-    FORMATO DE SAÍDA: Apenas o JSON, sem markdown ou explicações adicionais.
-    """
-    response = model.generate_content(prompt)
-    logger.debug(f"Resposta bruta do Gemini: {response.text}")  # Depuração
+RESPONDA APENAS COM JSON:
+"""
+    
     try:
-        # Extrai o conteúdo entre ```json
-        import re
-        json_str = re.search(r'```json\n(.*)\n```', response.text, re.DOTALL)
-        if json_str:
-            resultado = json.loads(json_str.group(1).strip())
-        else:
-            # Remove markdown se existir
-            clean_text = response.text.strip()
-            if clean_text.startswith('```json'):
-                clean_text = clean_text[7:-3]
-            elif clean_text.startswith('```'):
-                clean_text = clean_text[3:-3]
-            resultado = json.loads(clean_text)
+        response = model.generate_content(prompt)
+        logger.debug(f"Resposta bruta do Gemini: {response.text}")
         
-        # Retorna o resultado completo ao invés de campos específicos
+        # Limpa a resposta
+        clean_text = response.text.strip()
+        if clean_text.startswith('```json'):
+            clean_text = clean_text[7:-3]
+        elif clean_text.startswith('```'):
+            clean_text = clean_text[3:-3]
+        
+        resultado = json.loads(clean_text)
+        logger.success(f"Comando interpretado com sucesso: {resultado.get('intencao', 'N/A')}")
         return resultado
         
     except Exception as e:
-        print(f"Erro ao parsear JSON: {e}")
+        logger.error(f"Erro ao interpretar comando: {e}")
         return {
             "intencao": "nao_entendido",
             "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
         }
+
+def get_command_from_rabbitmq(topic="comandos_stella"):
+    """
+    Busca comandos do tópico RabbitMQ (mock)
+    
+    Args:
+        topic: Nome do tópico para consumir mensagens
+        
+    Returns:
+        Comando processado ou None em caso de falha
+    """
+    try:
+        logger.info(f"Buscando comando do tópico RabbitMQ: {topic}")
+        
+        # Consome mensagem do tópico
+        message = mock_rabbitmq.consume(topic)
+        
+        if message:
+            # Extrai o conteúdo da mensagem
+            content = message.get('content', {})
+            logger.success(f"Comando recebido do RabbitMQ: {content}")
+            
+            # Tenta extrair o comando do conteúdo
+            if isinstance(content, dict) and 'comando' in content:
+                return content['comando'].lower()
+            elif isinstance(content, str):
+                return content.lower()
+            else:
+                logger.error("Formato de mensagem não reconhecido")
+                return None
+        else:
+            logger.info(f"Nenhuma mensagem disponível no tópico {topic}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Erro ao acessar RabbitMQ: {e}")
+        return None
+
+def publish_response_to_rabbitmq(response, topic="respostas_stella"):
+    """
+    Publica resposta no tópico RabbitMQ (mock)
+    
+    Args:
+        response: Resposta a ser publicada
+        topic: Nome do tópico para publicar
+        
+    Returns:
+        True se publicado com sucesso, False caso contrário
+    """
+    try:
+        logger.info(f"Publicando resposta no tópico RabbitMQ: {topic}")
+        
+        # Formata resposta para publicação
+        response_data = {
+            "timestamp": datetime.now().isoformat(),
+            "resposta": response
+        }
+        
+        # Publica no tópico
+        result = mock_rabbitmq.publish(topic, response_data)
+        
+        if result:
+            logger.success(f"Resposta publicada com sucesso no tópico {topic}")
+        else:
+            logger.error(f"Falha ao publicar resposta no tópico {topic}")
+            
+        return result
+        
+    except Exception as e:
+        logger.error(f"Erro ao publicar resposta no RabbitMQ: {e}")
+        return False
 
 def process_action(resultado):
     if not resultado:
@@ -192,6 +209,9 @@ def process_action(resultado):
     print(f"Intenção identificada: {intencao}")
     if itens:
         print(f"Itens processados: {itens}")
+    
+    # Publica a resposta no RabbitMQ
+    publish_response_to_rabbitmq(resultado)
     
     # Aqui você implementará a lógica específica:
     if intencao == 'registrar_retirada':
@@ -206,13 +226,28 @@ def process_action(resultado):
     
     return confirmacao
 
-comando = read_json('stella/agent/falas.json')
-if comando:
-    print(f"Comando: {comando}\n")
-    resultado = command_interpreter(comando)
-    if resultado:
-        resposta = process_action(resultado)
+# Simplificando para usar APENAS RabbitMQ
+def get_command():
+    """Obtém comando APENAS do RabbitMQ mock - sem fallbacks"""
+    
+    # Tenta obter o comando do RabbitMQ
+    comando = get_command_from_rabbitmq()
+    if comando:
+        logger.info("Comando obtido via RabbitMQ")
+        return comando
     else:
-        print("Comando não entendido. Tente reformular.")
-else:
-    print("Nenhum comando válido para processar.")
+        logger.debug("Nenhum comando disponível no RabbitMQ")
+        return None
+
+# Novo fluxo principal
+if __name__ == "__main__":
+    comando = get_command()
+    if comando:
+        print(f"Comando: {comando}\n")
+        resultado = command_interpreter(comando)
+        if resultado:
+            resposta = process_action(resultado)
+        else:
+            print("Comando não entendido. Tente reformular.")
+    else:
+        print("Nenhum comando válido para processar.")
