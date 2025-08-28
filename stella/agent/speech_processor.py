@@ -20,7 +20,7 @@ except ImportError:
 logger.info("Iniciando o carregamento da chave API do Gemini...")
 
 # Tenta carregar do diretório atual e depois do diretório pai
-env_paths = ["GEMINI_API_KEY.env", "../GEMINI_API_KEY.env", "../../GEMINI_API_KEY.env"]
+env_paths = ["GEMINI_API_KEY.env", "../GEMINI_API_KEY.env", "../../GEMINI_API_KEY.env", ".env"]
 api_key = None
 
 for env_path in env_paths:
@@ -69,41 +69,93 @@ def command_interpreter(comando):
     model = genai.GenerativeModel('gemini-1.5-flash')
     estoque_data = load_estoque_data()
     
-    # Cria contexto de estoque simplificado
-    itens_disponiveis = list(estoque_data.get('estoque', {}).keys())
+    # 🔧 NOVA FORMA: Envia TODO o JSON do estoque
+    estoque_completo = estoque_data.get('estoque', {})
+    
+    # Formatar estoque de forma legível para a IA
+    estoque_formatado = ""
+    for item_key, item_data in estoque_completo.items():
+        nome_completo = item_data.get('nome_completo', item_key)
+        quantidade_atual = item_data.get('quantidade_atual', 0)
+        quantidade_minima = item_data.get('quantidade_minima', 0)
+        quantidade_critica = item_data.get('quantidade_critica', 0)
+        localizacao = item_data.get('localizacao', {})
+        unidade = item_data.get('unidade', 'unidade')
+        
+        status = "🟢 NORMAL"
+        if quantidade_atual <= quantidade_critica:
+            status = "🔴 CRÍTICO"
+        elif quantidade_atual <= quantidade_minima:
+            status = "🟡 BAIXO"
+        
+        gaveta = localizacao.get('gaveta', 'N/A') if localizacao else 'N/A'
+        
+        estoque_formatado += f"""
+• {item_key}: {nome_completo}
+  - Quantidade atual: {quantidade_atual} {unidade}
+  - Mínimo: {quantidade_minima} | Crítico: {quantidade_critica}
+  - Localização: Gaveta {gaveta}
+  - Status: {status}
+"""
     
     prompt = f"""
 Você é Stella, assistente de almoxarifado hospitalar. Analise este comando: "{comando}"
 
-ITENS DISPONÍVEIS NO ESTOQUE:
-{', '.join(itens_disponiveis)}
+ESTOQUE COMPLETO DISPONÍVEL:
+{estoque_formatado}
+
+CONTEXTO IMPORTANTE:
+- Última atualização: {estoque_data.get('ultima_atualizacao', 'N/A')}
+- Status 🔴 CRÍTICO = quantidade <= crítica
+- Status 🟡 BAIXO = quantidade <= mínima  
+- Status 🟢 NORMAL = quantidade > mínima
 
 IDENTIFIQUE A INTENÇÃO:
 
 1. RETIRADA DE ITEM: "preciso", "quero", "peguei", "retirar"
-   Retorne: {{"intencao": "registrar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "confirmacao": "Texto natural"}}
+   Retorne: {{"intencao": "registrar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "confirmacao": "Texto natural com avisos se necessário"}}
 
 2. CONSULTA ESTOQUE: "quanto tem", "quantos", "estoque"  
-   Retorne: {{"intencao": "consultar_estoque", "itens": [{{"item": "nome_item"}}], "confirmacao": "Texto natural"}}
+   Retorne: {{"intencao": "consultar_estoque", "itens": [{{"item": "nome_item"}}], "confirmacao": "Texto natural com quantidade atual e localização"}}
 
-3. CANCELAR: "cancelar", "desistir"
+3. CONSULTA LOCALIZAÇÃO: "onde está", "qual gaveta", "localização"
+   Retorne: {{"intencao": "consultar_localizacao", "itens": [{{"item": "nome_item"}}], "confirmacao": "Texto natural com localização"}}
+
+4. CANCELAR: "cancelar", "desistir"
    Retorne: {{"intencao": "cancelar_registro", "confirmacao": "Texto natural"}}
 
-4. DÚVIDAS: perguntas sobre localização
-   Retorne: {{"intencao": "responder_duvida", "confirmacao": "Texto natural"}}
+5. ALERTA ESTOQUE: quando detectar item em estado crítico/baixo
+   Retorne: {{"intencao": "alerta_estoque", "confirmacao": "Texto natural com aviso"}}
 
-5. NÃO ENTENDIDO: qualquer outra coisa
+6. NÃO ENTENDIDO: qualquer outra coisa
    Retorne: {{"intencao": "nao_entendido", "confirmacao": "Não entendi. Pode reformular?"}}
 
-IMPORTANTE:
+REGRAS IMPORTANTES:
 - Normalize nomes (ex: "seringa 10ml" → "seringa_10ml")
 - Retorne APENAS JSON válido
 - Seja natural e amigável
-- Não assuma um produto em caso de ambiguidade/dúvida, exemplo caso um usúario solicite retirar uma seringa sem especificar o tipo, não assuma seringa_10ml ou seringa_5ml, pergunte qual tipo de seringa ele deseja antes.
+- Em caso de ambiguidade, pergunte especificações (ex: qual tipo de seringa?)
 - Se o item não existir no estoque, use intenção "nao_entendido"
+- SEMPRE verifique se retirada deixará estoque em estado crítico/baixo
+- Inclua avisos sobre localização quando relevante
+- Para consultas, inclua quantidade atual e localização
+- Detecte outliers (quantidades muito altas/baixas solicitadas)
+
+EXEMPLOS DE RESPOSTAS COM CONTEXTO:
+- Retirada normal: "Registrei 5 seringas de 10ml. Restam 45 unidades na gaveta B."
+- Retirada com aviso: "⚠️ ATENÇÃO: Retirar 20 máscaras N95 deixará apenas 15 unidades (abaixo do mínimo de 30). Confirma?"
+- Consulta: "Temos 150 seringas de 5ml disponíveis na gaveta B (estoque normal)."
+- Crítico: "🔴 ALERTA: Agulhas 21G estão em estado CRÍTICO - apenas 5 unidades restantes!"
 
 RESPONDA APENAS COM JSON:
 """
+    
+    # 🔍 PRINT DO PROMPT COMPLETO
+    print("=" * 80)
+    print("PROMPT ENVIADO PARA O GEMINI:")
+    print("=" * 80)
+    print(prompt)
+    print("=" * 80)
     
     try:
         response = model.generate_content(prompt)
