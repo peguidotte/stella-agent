@@ -1,21 +1,8 @@
 import json
 import os
-from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 from loguru import logger
-
-# Corrigindo a importação - mudando de relativa para absoluta
-try:
-    from stella.agent.mock_rabbitmq import mock_rabbitmq
-except ImportError:
-    # Fallback para importação direta quando executado como script
-    try:
-        from mock_rabbitmq import mock_rabbitmq
-        logger.info("Mock RabbitMQ importado localmente")
-    except ImportError:
-        logger.error("Não foi possível importar mock_rabbitmq")
-        mock_rabbitmq = None
 
 logger.info("Iniciando o carregamento da chave API do Gemini...")
 
@@ -39,10 +26,6 @@ if not api_key:
 
 logger.success("GEMINI_API_KEY carregada com sucesso.")
 genai.configure(api_key=api_key)
-
-# Funções de fallback removidas - usando apenas RabbitMQ
-# def get_command_from_api(endpoint="comand"): - REMOVIDA
-# def read_json(arquivo): - REMOVIDA
 
 def load_estoque_data():
     try:
@@ -158,7 +141,8 @@ RESPONDA APENAS COM JSON:
     print("=" * 80)
     
     try:
-        response = model.generate_content(prompt)
+        chat = model.start_chat(history=[])
+        response = chat.send_message(prompt)
         logger.debug(f"Resposta bruta do Gemini: {response.text}")
         
         # Limpa a resposta
@@ -179,77 +163,6 @@ RESPONDA APENAS COM JSON:
             "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
         }
 
-def get_command_from_rabbitmq(topic="comandos_stella"):
-    """
-    Busca comandos do tópico RabbitMQ (mock)
-    
-    Args:
-        topic: Nome do tópico para consumir mensagens
-        
-    Returns:
-        Comando processado ou None em caso de falha
-    """
-    try:
-        logger.info(f"Buscando comando do tópico RabbitMQ: {topic}")
-        
-        # Consome mensagem do tópico
-        message = mock_rabbitmq.consume(topic)
-        
-        if message:
-            # Extrai o conteúdo da mensagem
-            content = message.get('content', {})
-            logger.success(f"Comando recebido do RabbitMQ: {content}")
-            
-            # Tenta extrair o comando do conteúdo
-            if isinstance(content, dict) and 'comando' in content:
-                return content['comando'].lower()
-            elif isinstance(content, str):
-                return content.lower()
-            else:
-                logger.error("Formato de mensagem não reconhecido")
-                return None
-        else:
-            logger.info(f"Nenhuma mensagem disponível no tópico {topic}")
-            return None
-            
-    except Exception as e:
-        logger.error(f"Erro ao acessar RabbitMQ: {e}")
-        return None
-
-def publish_response_to_rabbitmq(response, topic="respostas_stella"):
-    """
-    Publica resposta no tópico RabbitMQ (mock)
-    
-    Args:
-        response: Resposta a ser publicada
-        topic: Nome do tópico para publicar
-        
-    Returns:
-        True se publicado com sucesso, False caso contrário
-    """
-    try:
-        logger.info(f"Publicando resposta no tópico RabbitMQ: {topic}")
-        
-        # Formata resposta para publicação
-        response_data = {
-            "timestamp": datetime.now().isoformat(),
-            "resposta": response
-        }
-        
-        # Publica no tópico
-        result = mock_rabbitmq.publish(topic, response_data)
-        
-        if result:
-            logger.success(f"Resposta publicada com sucesso no tópico {topic}")
-        else:
-            logger.error(f"Falha ao publicar resposta no tópico {topic}")
-            
-        return result
-        
-    except Exception as e:
-        logger.error(f"Erro ao publicar resposta no RabbitMQ: {e}")
-        return False
-
 def process_action(resultado):
     if not resultado:
         return "Comando não reconhecido."
@@ -261,9 +174,6 @@ def process_action(resultado):
     print(f"Intenção identificada: {intencao}")
     if itens:
         print(f"Itens processados: {itens}")
-    
-    # Publica a resposta no RabbitMQ
-    publish_response_to_rabbitmq(resultado)
     
     # Aqui você implementará a lógica específica:
     if intencao == 'registrar_retirada':
@@ -278,28 +188,236 @@ def process_action(resultado):
     
     return confirmacao
 
-# Simplificando para usar APENAS RabbitMQ
-def get_command():
-    """Obtém comando APENAS do RabbitMQ mock - sem fallbacks"""
+# =====================
+# Chat integrado (StellaInteligente)
+# =====================
+class StellaInteligente:
+    """Chat inteligente com Stella usando o Gemini (contexto mantido pela API)."""
     
-    # Tenta obter o comando do RabbitMQ
-    comando = get_command_from_rabbitmq()
-    if comando:
-        logger.info("Comando obtido via RabbitMQ")
-        return comando
-    else:
-        logger.debug("Nenhum comando disponível no RabbitMQ")
-        return None
+    def __init__(self):
+        self.user_name = "Usuário"
+        self.pedidos_sessao = []  # Pedidos da sessão atual
+        
+        # Modelo Gemini com instrução de sistema e sessão de chat (histórico mantido pela API)
+        self.model = genai.GenerativeModel(
+            'gemini-1.5-flash',
+            system_instruction=(
+                "Você é Stella, assistente de almoxarifado hospitalar."
+                " Mantenha conversa natural e contínua, use o contexto da sessão,"
+                " seja objetiva, amigável e prestativa."
+            ),
+        )
+        self.chat = self.model.start_chat(history=[])
 
-# Novo fluxo principal
-if __name__ == "__main__":
-    comando = get_command()
-    if comando:
-        print(f"Comando: {comando}\n")
-        resultado = command_interpreter(comando)
-        if resultado:
-            resposta = process_action(resultado)
+    # -------- Deterministic estoque helpers --------
+    def _get_estoque(self):
+        try:
+            data = load_estoque_data()
+            return data.get('estoque', {})
+        except Exception:
+            return {}
+
+    def _normalize_item(self, nome: str) -> str | None:
+        t = (nome or '').lower().strip()
+        t = t.replace('-', ' ').replace('_', ' ')
+        # atalhos por palavras-chave
+        if 'seringa' in t and ('10' in t or '10ml' in t or '10 ml' in t):
+            return 'seringa_10ml'
+        if 'seringa' in t and ('5' in t or '5ml' in t or '5 ml' in t):
+            return 'seringa_5ml'
+        if 'agulha' in t and '21' in t:
+            return 'agulha_21g'
+        if 'agulha' in t and '10' in t:
+            return 'agulha_10g'
+        if 'n95' in t or 'máscara' in t or 'mascara' in t:
+            return 'mascara_n95'
+        if 'luva' in t:
+            return 'luva'
+        if 'gaze' in t:
+            return 'gaze'
+        # tentativa direta
+        key = t.replace(' ', '_')
+        return key or None
+
+    def _status_label(self, qtd: int | float, minimo: int | float, critico: int | float) -> str:
+        try:
+            if qtd <= critico:
+                return '🔴 CRÍTICO'
+            if qtd <= minimo:
+                return '🟡 BAIXO'
+            return '🟢 NORMAL'
+        except Exception:
+            return '🟢 NORMAL'
+
+    def _responder_consulta_estoque(self, itens: list[dict]) -> str:
+        estoque = self._get_estoque()
+        respostas = []
+        not_found = []
+        for it in itens or []:
+            nome = it.get('item') if isinstance(it, dict) else str(it)
+            key = self._normalize_item(nome)
+            dados = estoque.get(key or '')
+            if not dados:
+                not_found.append(nome)
+                continue
+            qtd = dados.get('quantidade_atual', 0)
+            un = dados.get('unidade', 'unidade')
+            loc = (dados.get('localizacao') or {}).get('gaveta', 'N/A')
+            minimo = dados.get('quantidade_minima', 0)
+            crit = dados.get('quantidade_critica', 0)
+            status = self._status_label(qtd, minimo, crit)
+            nome_full = dados.get('nome_completo', key)
+            respostas.append(f"Temos {qtd} {un} de {nome_full} na gaveta {loc} ({status}).")
+        if not_found:
+            disponiveis = ', '.join(sorted(estoque.keys())) or '—'
+            respostas.append(f"Itens não encontrados: {', '.join(not_found)}. Disponíveis: {disponiveis}.")
+        return ' '.join(respostas) if respostas else 'Não encontrei esses itens no estoque.'
+
+    def _responder_consulta_localizacao(self, itens: list[dict]) -> str:
+        estoque = self._get_estoque()
+        respostas = []
+        not_found = []
+        for it in itens or []:
+            nome = it.get('item') if isinstance(it, dict) else str(it)
+            key = self._normalize_item(nome)
+            dados = estoque.get(key or '')
+            if not dados:
+                not_found.append(nome)
+                continue
+            loc = dados.get('localizacao', {}) or {}
+            setor = loc.get('setor', '—')
+            prat = loc.get('prateleira', '—')
+            gav = loc.get('gaveta', '—')
+            nome_full = dados.get('nome_completo', key)
+            respostas.append(f"{nome_full} fica no Setor {setor}, Prateleira {prat}, Gaveta {gav}.")
+        if not_found:
+            disponiveis = ', '.join(sorted(estoque.keys())) or '—'
+            respostas.append(f"Itens não encontrados: {', '.join(not_found)}. Disponíveis: {disponiveis}.")
+        return ' '.join(respostas) if respostas else 'Não encontrei a localização solicitada.'
+
+    # -------- Chat + roteamento de intenção --------
+    def process_with_context(self, user_message: str) -> str:
+        # 1) Tenta interpretar intenção primeiro (para evitar alucinações em consultas)
+        try:
+            resultado = command_interpreter(user_message)
+            intencao = (resultado or {}).get('intencao')
+            itens = (resultado or {}).get('itens', [])
+            if intencao == 'consultar_estoque':
+                return self._responder_consulta_estoque(itens)
+            if intencao == 'consultar_localizacao':
+                return self._responder_consulta_localizacao(itens)
+            # Poderíamos tratar outras intenções aqui futuramente (registrar_retirada, etc.)
+        except Exception as e:
+            logger.debug(f"Falha na interpretação estruturada, usando chat: {e}")
+        
+        # 2) Fallback: conversa livre pelo chat do Gemini
+        try:
+            response = self.chat.send_message(user_message)
+            resposta = (response.text or "").strip()
+            if not resposta:
+                resposta = self.generate_natural_response(user_message)
+            return resposta
+        except Exception as e:
+            logger.error(f"Erro ao processar mensagem: {e}")
+            return "Desculpe, tive um problema. Pode repetir sua mensagem?"
+
+    def generate_natural_response(self, message: str) -> str:
+        message_lower = message.lower()
+        try:
+            history_len = len(getattr(self.chat, 'history', []) or [])
+        except Exception:
+            history_len = 0
+        
+        if any(g in message_lower for g in ["olá", "oi", "ola", "hey", "e aí"]):
+            return (f"Olá {self.user_name}! Sou a Stella, assistente do almoxarifado. Como posso ajudar você hoje?"
+                    if history_len <= 1 else "Oi! Em que mais posso ajudar?")
+        if any(w in message_lower for w in ["tudo bem", "como vai", "como está"]):
+            return "Estou muito bem, obrigada! Pronta para ajudar com o almoxarifado. E você, como está?"
+        if any(w in message_lower for w in ["nome", "quem é", "você é"]):
+            return "Sou a Stella, sua assistente virtual do almoxarifado hospitalar. Estou aqui para ajudar com materiais e suprimentos!"
+        if any(w in message_lower for w in ["pedido", "pedi", "solicitei", "último"]):
+            if self.pedidos_sessao:
+                return f"Você pediu: {', '.join(self.pedidos_sessao)}. Precisa de mais alguma coisa?"
+            return "Ainda não vejo pedidos nesta conversa. O que você precisa?"
+        if any(w in message_lower for w in ["obrigad", "valeu", "thanks"]):
+            return "De nada! Foi um prazer ajudar. Se precisar de mais alguma coisa, estarei aqui!"
+        return "Entendi! Como assistente do almoxarifado, posso ajudar com seringas, luvas, gazes e outros materiais. O que você precisa?"
+
+    def show_history(self):
+        print("\n" + "="*50)
+        print("📝 HISTÓRICO DA CONVERSA")
+        print("="*50)
+        history = getattr(self.chat, 'history', []) or []
+        for i, msg in enumerate(history, 1):
+            try:
+                role = getattr(msg, 'role', None) or (msg.get('role') if isinstance(msg, dict) else 'model')
+            except Exception:
+                role = 'model'
+            role_name = self.user_name if role == 'user' else 'Stella'
+            content_text = ''
+            try:
+                parts = getattr(msg, 'parts', None) or (msg.get('parts') if isinstance(msg, dict) else None)
+                if parts is not None:
+                    texts = []
+                    for p in parts:
+                        if hasattr(p, 'text'):
+                            texts.append(p.text)
+                        elif isinstance(p, dict) and 'text' in p:
+                            texts.append(p['text'])
+                        else:
+                            texts.append(str(p))
+                    content_text = ' '.join([t for t in texts if t])
+                else:
+                    content_text = str(getattr(msg, 'text', getattr(msg, 'content', '')))
+            except Exception:
+                content_text = ''
+            content = (content_text[:100] + "...") if len(content_text) > 100 else content_text
+            print(f"{i:2d}. {role_name}: {content}")
+        print(f"\n💬 Total: {len(history)} mensagens")
+        print("="*50)
+
+    def show_pedidos(self):
+        print("\n" + "="*30)
+        print("📦 PEDIDOS DESTA SESSÃO")
+        print("="*30)
+        if self.pedidos_sessao:
+            for i, pedido in enumerate(self.pedidos_sessao, 1):
+                print(f"{i}. {pedido}")
         else:
-            print("Comando não entendido. Tente reformular.")
-    else:
-        print("Nenhum comando válido para processar.")
+            print("Nenhum pedido registrado ainda.")
+        print("="*30)
+
+    def start_chat(self):
+        print("🧠 STELLA INTELIGENTE - GEMINI + CONTEXTO")
+        print("=" * 50)
+        self.user_name = input("Seu nome: ").strip() or "Usuário"
+        print(f"\n✅ Olá {self.user_name}! Sistema inteligente ativo.")
+        print("Digite 'sair' para encerrar, 'historico' para ver conversa\n")
+        initial_message = (f"Olá {self.user_name}! Sou a Stella, sua assistente inteligente do almoxarifado. "
+                           f"Como posso ajudar você hoje?")
+        print(f"Stella: {initial_message}")
+        try:
+            while True:
+                user_input = input(f"\n{self.user_name}: ").strip()
+                if not user_input:
+                    continue
+                if user_input.lower() in ['sair', 'exit', 'tchau']:
+                    print("Stella: Até mais! Foi um prazer conversar com você! 👋")
+                    break
+                if user_input.lower() == 'historico':
+                    self.show_history(); continue
+                if user_input.lower() == 'pedidos':
+                    self.show_pedidos(); continue
+                print("🧠 Stella está processando...")
+                ai_response = self.process_with_context(user_input)
+                print(f"Stella: {ai_response}")
+        except KeyboardInterrupt:
+            print("\n\nTchau! 👋")
+        except Exception as e:
+            print(f"\n❌ Erro: {e}")
+
+# Novo fluxo principal (RabbitMQ removido)
+if __name__ == "__main__":
+    # Fallback: inicia chat interativo integrado
+    chat = StellaInteligente()
+    chat.start_chat()
