@@ -192,22 +192,21 @@ def process_action(resultado):
 # Chat integrado (StellaInteligente)
 # =====================
 class StellaInteligente:
-    """Chat inteligente com Stella usando o Gemini (contexto mantido pela API)."""
+    """Chat inteligente com Stella usando o Gemini, mantendo histórico local (em memória)."""
     
     def __init__(self):
         self.user_name = "Usuário"
         self.pedidos_sessao = []  # Pedidos da sessão atual
-        
-        # Modelo Gemini com instrução de sistema e sessão de chat (histórico mantido pela API)
-        self.model = genai.GenerativeModel(
-            'gemini-1.5-flash',
-            system_instruction=(
-                "Você é Stella, assistente de almoxarifado hospitalar."
-                " Mantenha conversa natural e contínua, use o contexto da sessão,"
-                " seja objetiva, amigável e prestativa."
-            ),
+        # Instrução de sistema local + histórico local (não usa memória do chat Gemini)
+        self.system_instruction = (
+            "Você é Stella, assistente de almoxarifado hospitalar."
+            " Mantenha conversa natural e contínua, use o contexto da sessão,"
+            " seja objetiva, amigável e prestativa."
         )
-        self.chat = self.model.start_chat(history=[])
+        # Modelo básico; o contexto será injetado via prompt
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Histórico local de mensagens [{role: 'user'|'assistant', text: str}]
+        self.history: list[dict] = []
 
     # -------- Deterministic estoque helpers --------
     def _get_estoque(self):
@@ -295,6 +294,34 @@ class StellaInteligente:
             respostas.append(f"Itens não encontrados: {', '.join(not_found)}. Disponíveis: {disponiveis}.")
         return ' '.join(respostas) if respostas else 'Não encontrei a localização solicitada.'
 
+    # -------- Histórico local + chat --------
+    def _build_history_text(self, max_messages: int = 12) -> str:
+        linhas = []
+        for msg in self.history[-max_messages:]:
+            role_name = self.user_name if msg.get('role') == 'user' else 'Stella'
+            linhas.append(f"{role_name}: {msg.get('text', '')}")
+        return "\n".join(linhas)
+
+    def _chat_with_local_context(self, user_message: str) -> str:
+        prompt = (
+            f"{self.system_instruction}\n\n"
+            f"Histórico da conversa (mais recente primeiro):\n{self._build_history_text()}\n\n"
+            f"{self.user_name}: {user_message}\n"
+            f"Stella: "
+        )
+        try:
+            response = self.model.generate_content(prompt)
+            resposta = (getattr(response, 'text', '') or '').strip()
+            if not resposta:
+                resposta = self.generate_natural_response(user_message)
+        except Exception as e:
+            logger.error(f"Erro ao gerar resposta com histórico local: {e}")
+            resposta = self.generate_natural_response(user_message)
+        # Atualiza histórico local
+        self.history.append({"role": "user", "text": user_message})
+        self.history.append({"role": "assistant", "text": resposta})
+        return resposta
+
     # -------- Chat + roteamento de intenção --------
     def process_with_context(self, user_message: str) -> str:
         # 1) Tenta interpretar intenção primeiro (para evitar alucinações em consultas)
@@ -303,28 +330,27 @@ class StellaInteligente:
             intencao = (resultado or {}).get('intencao')
             itens = (resultado or {}).get('itens', [])
             if intencao == 'consultar_estoque':
-                return self._responder_consulta_estoque(itens)
+                resp = self._responder_consulta_estoque(itens)
+                # registra no histórico local
+                self.history.append({"role": "user", "text": user_message})
+                self.history.append({"role": "assistant", "text": resp})
+                return resp
             if intencao == 'consultar_localizacao':
-                return self._responder_consulta_localizacao(itens)
+                resp = self._responder_consulta_localizacao(itens)
+                self.history.append({"role": "user", "text": user_message})
+                self.history.append({"role": "assistant", "text": resp})
+                return resp
             # Poderíamos tratar outras intenções aqui futuramente (registrar_retirada, etc.)
         except Exception as e:
             logger.debug(f"Falha na interpretação estruturada, usando chat: {e}")
         
-        # 2) Fallback: conversa livre pelo chat do Gemini
-        try:
-            response = self.chat.send_message(user_message)
-            resposta = (response.text or "").strip()
-            if not resposta:
-                resposta = self.generate_natural_response(user_message)
-            return resposta
-        except Exception as e:
-            logger.error(f"Erro ao processar mensagem: {e}")
-            return "Desculpe, tive um problema. Pode repetir sua mensagem?"
+        # 2) Fallback: conversa livre com histórico local (não usa memória do Gemini)
+        return self._chat_with_local_context(user_message)
 
     def generate_natural_response(self, message: str) -> str:
         message_lower = message.lower()
         try:
-            history_len = len(getattr(self.chat, 'history', []) or [])
+            history_len = len(self.history)
         except Exception:
             history_len = 0
         
@@ -345,32 +371,13 @@ class StellaInteligente:
 
     def show_history(self):
         print("\n" + "="*50)
-        print("📝 HISTÓRICO DA CONVERSA")
+        print("📝 HISTÓRICO DA CONVERSA (local)")
         print("="*50)
-        history = getattr(self.chat, 'history', []) or []
+        history = self.history or []
         for i, msg in enumerate(history, 1):
-            try:
-                role = getattr(msg, 'role', None) or (msg.get('role') if isinstance(msg, dict) else 'model')
-            except Exception:
-                role = 'model'
+            role = msg.get('role', 'assistant')
             role_name = self.user_name if role == 'user' else 'Stella'
-            content_text = ''
-            try:
-                parts = getattr(msg, 'parts', None) or (msg.get('parts') if isinstance(msg, dict) else None)
-                if parts is not None:
-                    texts = []
-                    for p in parts:
-                        if hasattr(p, 'text'):
-                            texts.append(p.text)
-                        elif isinstance(p, dict) and 'text' in p:
-                            texts.append(p['text'])
-                        else:
-                            texts.append(str(p))
-                    content_text = ' '.join([t for t in texts if t])
-                else:
-                    content_text = str(getattr(msg, 'text', getattr(msg, 'content', '')))
-            except Exception:
-                content_text = ''
+            content_text = msg.get('text', '')
             content = (content_text[:100] + "...") if len(content_text) > 100 else content_text
             print(f"{i:2d}. {role_name}: {content}")
         print(f"\n💬 Total: {len(history)} mensagens")
@@ -388,7 +395,7 @@ class StellaInteligente:
         print("="*30)
 
     def start_chat(self):
-        print("🧠 STELLA INTELIGENTE - GEMINI + CONTEXTO")
+        print("🧠 STELLA INTELIGENTE - GEMINI + CONTEXTO LOCAL")
         print("=" * 50)
         self.user_name = input("Seu nome: ").strip() or "Usuário"
         print(f"\n✅ Olá {self.user_name}! Sistema inteligente ativo.")
@@ -396,6 +403,8 @@ class StellaInteligente:
         initial_message = (f"Olá {self.user_name}! Sou a Stella, sua assistente inteligente do almoxarifado. "
                            f"Como posso ajudar você hoje?")
         print(f"Stella: {initial_message}")
+        # Registra mensagem inicial no histórico
+        self.history.append({"role": "assistant", "text": initial_message})
         try:
             while True:
                 user_input = input(f"\n{self.user_name}: ").strip()
