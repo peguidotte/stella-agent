@@ -1,127 +1,161 @@
-"""
-Stella Agent - Ponto de Entrada Principal
-
-Sistema de IA para gerenciamento de almoxarifado com:
-- Autenticação por Face ID e PIN (HU-01)
-- Solicitação de retirada de produtos por voz (HU-02) 
-- Validação de retirada com confirmação de identidade (HU-03)
-"""
-
-import asyncio
-
-from stella.core.session_manager import SessionManager
-from stella.agent.speech_processor import SpeechProcessor
-from stella.face_id.face_recognizer import FaceRecognizer
-from stella.messaging.unit_system_client import UnitSystemClient
-from stella.config.settings import Settings
+from fastapi import FastAPI, Request, HTTPException, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from loguru import logger
+from datetime import datetime
+import uuid
+import os
+from websocket.websocket_manager import WebSocketManager
 
 
-class StellaAgent:
+app = FastAPI(title="Stella Server")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# Instância global do agent
+stella_socket = WebSocketManager()
+
+@app.post("/pusher/auth")
+async def pusher_auth(channel_name: str = Form(...), socket_id: str = Form(...)):
     """
-    Classe principal do agente Stella
-    Gerencia o ciclo de vida da aplicação e coordena os módulos
+    Autentica canais privados do Pusher
+    Endpoint necessário para canais private-*
     """
-    
-    def __init__(self):
-        """Inicializa o agente Stella com todos os módulos necessários"""
-        print("Inicializando Stella Agent...")
+    try:
+        logger.info(f"🔐 Requisição de autenticação: canal={channel_name}, socket={socket_id}")
         
-        # Carrega configurações
-        self.settings = Settings()
+        # Aqui você poderia validar o usuário, mas no teste a gente só libera:
+        auth = stella_socket.authenticate_channel(channel_name, socket_id)
         
-        # Inicializa módulos
-        self.session_manager = SessionManager()
-        self.speech_processor = SpeechProcessor()
-        self.face_recognizer = FaceRecognizer()
-        self.unit_system_client = UnitSystemClient()
+        return JSONResponse(content=auth)
         
-        # Estado da aplicação
-        self.is_running = False
-        self.current_session = None
-        
-        print("Stella Agent inicializado com sucesso")
-    
-    async def start(self):
-        """Inicia o agente Stella"""
-        print("Iniciando Stella Agent...")
-        self.is_running = True
-        
-        try:
-            # Inicia os serviços necessários
-            await self._initialize_services()
-            
-            # Loop principal da aplicação
-            await self._main_loop()
-            
-        except KeyboardInterrupt:
-            print("Recebido sinal de interrupção")
-        except Exception as e:
-            print(f"Erro durante execução: {e}")
-        finally:
-            await self.stop()
-    
-    async def stop(self):
-        """Para o agente Stella de forma limpa"""
-        print("Parando Stella Agent...")
-        self.is_running = False
-        
-        # Cleanup dos recursos
-        await self._cleanup_services()
-        
-        print("Stella Agent parado")
-    
-    async def _initialize_services(self):
-        """Inicializa todos os serviços necessários"""
-        print("Inicializando serviços...")
-        
-        # TODO: Implementar inicialização dos serviços
-        # - Configurar reconhecimento de voz
-        # - Inicializar câmera para Face ID  
-        # - Conectar com sistema de mensageria
-        # - Carregar configurações da unidade
-        
-        pass
-    
-    async def _cleanup_services(self):
-        """Limpa recursos dos serviços"""
-        print("Limpando recursos...")
-        
-        # TODO: Implementar cleanup
-        # - Fechar conexões de rede
-        # - Liberar recursos de câmera/áudio
-        # - Salvar estado se necessário
-        
-        pass
-    
-    async def _main_loop(self):
-        """Loop principal da aplicação"""
-        print("Entrando no loop principal...")
-        
-        while self.is_running:
-            try:
-                # TODO: Implementar lógica principal
-                # 1. Escutar pela palavra-chave "Stella"
-                # 2. Processar comandos de voz
-                # 3. Gerenciar fluxos das HUs (autenticação, solicitação, validação)
-                # 4. Enviar notificações ao Sistema da Unidade
-                
-                # Por enquanto, apenas aguarda
-                await asyncio.sleep(0.1)
-                
-            except Exception as e:
-                print(f"Erro no loop principal: {e}")
-                await asyncio.sleep(1)
+    except Exception as e:
+        logger.error(f"❌ Erro na autenticação: {e}")
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
+@app.get("/test/speech")
+async def test_speech():
+    """Endpoint para testar speech output"""
+    stella_socket.test_send_speech_output()
+    return {"status": "success", "message": "Test speech output sent"}
 
-async def main():
-    """Função principal de entrada"""
-    print("=== Iniciando Stella Agent ===")
-    
-    # Criar e iniciar o agente
-    stella = StellaAgent()
-    await stella.start()
+@app.get("/test/face")
+async def test_face():
+    """Endpoint para testar face output"""
+    stella_socket.test_send_face_output()
+    return {"status": "success", "message": "Test face output sent"}
 
+@app.post("/api/speech")
+async def api_speech(request: Request):
+    """
+    Recebe mensagem de speech via HTTP POST do front-end
+    Processa e envia resposta via Pusher WebSocket
+    """
+    try:
+        data = await request.json()
+        correlation_id = data.get('correlation_id', str(uuid.uuid4()))
+        
+        logger.info(f"📥 Recebida mensagem speech via HTTP: {correlation_id}")
+        
+        # Processa usando o handler
+        result = stella_socket.handle_speech_input(data, stella_socket.default_channel)
+        
+        return {
+            "status": "success",
+            "correlation_id": correlation_id,
+            "message": "Speech processado e resposta enviada via Pusher",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro processando speech via HTTP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/face")
+async def api_face(request: Request):
+    """
+    Recebe mensagem de face recognition via HTTP POST do front-end
+    Processa e envia resposta via Pusher WebSocket
+    """
+    try:
+        data = await request.json()
+        correlation_id = data.get('correlation_id', str(uuid.uuid4()))
+        
+        logger.info(f"📥 Recebida mensagem face via HTTP: {correlation_id}")
+        
+        # Processa usando o handler
+        result = stella_socket.handle_face_input(data, stella_socket.default_channel)
+        
+        return {
+            "status": "success",
+            "correlation_id": correlation_id,
+            "message": "Face processado e resposta enviada via Pusher",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro processando face via HTTP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/test/auth")
+async def test_auth():
+    """Testa autenticação com dados mock"""
+    try:
+        test_channel = "private-agent-123"
+        test_socket_id = "123456.7890123"
+        
+        auth = stella_socket.authenticate_channel(test_channel, test_socket_id)
+        
+        return {
+            "status": "success", 
+            "message": "Autenticação testada com sucesso",
+            "auth": auth,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro testando auth: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/")
+async def root():
+    """Status do servidor e endpoints disponíveis"""
+    return {
+        "service": "Stella Pusher HTTP + WebSocket Server",
+        "status": "running",
+        "pusher_cluster": os.environ.get('PUSHER_CLUSTER', 'us2'),
+        "supported_events": list(stella_socket.event_handlers.keys()),
+        "auth_endpoint": "/pusher/auth",
+        "api_endpoints": {
+            "speech": "POST /api/speech",
+            "face": "POST /api/face",
+            "test_speech": "GET /test/speech",
+            "test_face": "GET /test/face",
+            "test_auth": "GET /test/auth"
+        },
+        "timestamp": datetime.now().isoformat()
+    }
 
 if __name__ == "__main__":
-    # Executar o agente
-    asyncio.run(main())
+    import uvicorn
+    
+    logger.info("Iniciando Stella...")
+    logger.info("Auth endpoint: http://localhost:8000/pusher/auth")
+    logger.info("API endpoints:")
+    logger.info("   POST http://localhost:8000/api/speech")
+    logger.info("   POST http://localhost:8000/api/face")
+    logger.info("Test endpoints:")
+    logger.info("   GET http://localhost:8000/test/speech")
+    logger.info("   GET http://localhost:8000/test/face")
+    logger.info("   GET http://localhost:8000/test/auth")
+    logger.info("Fluxo: Front HTTP POST → Back processa → Pusher WebSocket → Front")
+
+    try:
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    except KeyboardInterrupt:
+        logger.info("Servidor encerrado")
