@@ -19,10 +19,13 @@ loguru==0.7.3                  # Sistema de logging avançado
 
 # Desenvolvimento ---------------------------------------------
 pytest==8.4.1                  # Framework de testes
+fastapi                        # Framework web para Python
+uvicorn                       # Servidor ASGI para FastAPI
 # -------------------------------------------------------------
 
-# RabbitMQ Real (Messaging) -----------------------------------
+# Comunicações (AMQP/WebSocket) -----------------------------------
 pika==1.3.2                    # Cliente oficial RabbitMQ para Python
+pusher==3.3.3                  # Cliente oficial Pusher para Python
 # -------------------------------------------------------------
 
 # Processamento de Linguagem Natural (NLP) --------------------
