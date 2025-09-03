@@ -3,56 +3,95 @@ import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 from loguru import logger
+import sys
+import time
+import threading
+from typing import Dict, Optional, Any
 
-logger.info("Iniciando o carregamento da chave API do Gemini...")
+ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+load_dotenv(dotenv_path=ENV_PATH)
 
-# Tenta carregar do diretório atual e depois do diretório pai
-env_paths = ["GEMINI_API_KEY.env", "../GEMINI_API_KEY.env", "../../GEMINI_API_KEY.env", ".env"]
-api_key = None
+def require_gemini_env() -> str:
+    """Garante que a GEMINI_API_KEY exista; encerra o processo se faltar."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        logger.error(
+            "GEMINI_API_KEY ausente. Defina no .env ({}) ou no ambiente e reinicie."
+            .format(ENV_PATH)
+        )
+        sys.exit(1)
+    logger.success("Variável de ambiente GEMINI_API_KEY carregada.")
+    return api_key
 
-for env_path in env_paths:
-    if os.path.exists(env_path):
-        load_dotenv(env_path)
-        api_key = os.getenv("GEMINI_API_KEY")
-        if api_key:
-            logger.info(f"GEMINI_API_KEY carregada de: {env_path}")
-            break
+# Fail fast e configuração do SDK
+api_key = require_gemini_env()
 
-if not api_key:
-    logger.error("GEMINI_API_KEY não encontrada.")
-    logger.warning("Verifique se existe o arquivo '.env' no raiz do projeto.")
-    logger.warning("Certifique-se de que a variável 'GEMINI_API_KEY' está definida no arquivo")
-    raise ValueError("GEMINI_API_KEY not found in environment variables. Please check that '.env' exists in the project root and contains the 'GEMINI_API_KEY' variable.")
-
-logger.success("GEMINI_API_KEY carregada com sucesso.")
 genai.configure(api_key=api_key)
+
+MODEL_ID = 'gemini-2.5-flash'
+SYSTEM_INSTRUCTION = (
+    "Você é Stella, assistente de almoxarifado hospitalar. Mantenha contexto por sessão. "
+    "Seja objetiva, amigável e sempre retorne JSON válido conforme o esquema solicitado."
+)
+model = genai.GenerativeModel(MODEL_ID, system_instruction=SYSTEM_INSTRUCTION)
+
+# Armazenamento simples em memória para sessões Gemini
+_SESSIONS: Dict[str, Any] = {}  # Any porque ChatSession não está em genai.types
+_LAST_SEEN: Dict[str, float] = {}
+_SESSION_TTL_SECONDS = 3 * 60  # 3 minutos
+
+def _gc_sessions():
+    """Coleta sessões inativas (TTL)."""
+    now = time.time()
+    expired = [sid for sid, ts in _LAST_SEEN.items() if now - ts > _SESSION_TTL_SECONDS]
+    for sid in expired:
+        _SESSIONS.pop(sid, None)
+        _LAST_SEEN.pop(sid, None)
+        logger.info(f"Sessão expirada e removida: {sid}")
+
+def get_or_create_session(session_id: str) -> Any:
+    """Retorna ou cria uma ChatSession por session_id."""
+    if not session_id:
+        raise ValueError("session_id é obrigatório para manter contexto.")
+    sess = _SESSIONS.get(session_id)
+    if sess is None:
+        sess = model.start_chat(history=[])
+        _SESSIONS[session_id] = sess
+        logger.info(f"Sessão criada: {session_id}")
+    _LAST_SEEN[session_id] = time.time()
+    _gc_sessions()
+    return sess
+
+def end_session(session_id: str):
+    """Encerrar sessão explicitamente (opcional)."""
+    _SESSIONS.pop(session_id, None)
+    _LAST_SEEN.pop(session_id, None)
+    logger.info(f"Sessão encerrada: {session_id}")
 
 def load_estoque_data():
     try:
-        # Tenta diferentes caminhos para o arquivo de estoque
-        estoque_paths = [
-            'data/estoque_almoxarifado.json', 
-            '../data/estoque_almoxarifado.json',
-            '../../data/estoque_almoxarifado.json'
-        ]
-        
-        for path in estoque_paths:
-            if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        
-        # Se não encontrou o arquivo, retorna dados de exemplo
-        logger.warning("Arquivo de estoque não encontrado, usando dados de exemplo")
-        return {"estoque": {}}
+        # Caminho único e absoluto para o arquivo de estoque
+        stock_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'data', 'stock.json')
+        )
+
+        if not os.path.exists(stock_path):
+            logger.error(f"Arquivo de estoque não encontrado em: {stock_path}")
+            return {"estoque": {}}
+
+        with open(stock_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
     except Exception as e:
         logger.error(f"Erro ao carregar dados do estoque: {e}")
         return {"estoque": {}}
 
-def command_interpreter(comando):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+def command_interpreter(comando: str, session_id: str):
+    sess = get_or_create_session(session_id)
+    estoque_data = load_estoque_data()
+    model = genai.GenerativeModel('gemini-2.5-flash')
     estoque_data = load_estoque_data()
     
-    # 🔧 NOVA FORMA: Envia TODO o JSON do estoque
     estoque_completo = estoque_data.get('estoque', {})
     
     # Formatar estoque de forma legível para a IA
@@ -74,76 +113,75 @@ def command_interpreter(comando):
         gaveta = localizacao.get('gaveta', 'N/A') if localizacao else 'N/A'
         
         estoque_formatado += f"""
-• {item_key}: {nome_completo}
-  - Quantidade atual: {quantidade_atual} {unidade}
-  - Mínimo: {quantidade_minima} | Crítico: {quantidade_critica}
-  - Localização: Gaveta {gaveta}
-  - Status: {status}
-"""
+        • {item_key}: {nome_completo}
+        - Quantidade atual: {quantidade_atual} {unidade}
+        - Mínimo: {quantidade_minima} | Crítico: {quantidade_critica}
+        - Localização: Gaveta {gaveta}
+        - Status: {status}
+        """
     
     prompt = f"""
-Você é Stella, assistente de almoxarifado hospitalar. Analise este comando: "{comando}"
+        Você é Stella, assistente de almoxarifado hospitalar. Analise este comando: "{comando}"
 
-ESTOQUE COMPLETO DISPONÍVEL:
-{estoque_formatado}
+        ESTOQUE COMPLETO DISPONÍVEL:
+        {estoque_formatado}
 
-CONTEXTO IMPORTANTE:
-- Última atualização: {estoque_data.get('ultima_atualizacao', 'N/A')}
-- Status 🔴 CRÍTICO = quantidade <= crítica
-- Status 🟡 BAIXO = quantidade <= mínima  
-- Status 🟢 NORMAL = quantidade > mínima
+        CONTEXTO IMPORTANTE:
+        - Última atualização: {estoque_data.get('ultima_atualizacao', 'N/A')}
+        - Status 🔴 CRÍTICO = quantidade <= crítica
+        - Status 🟡 BAIXO = quantidade <= mínima  
+        - Status 🟢 NORMAL = quantidade > mínima
 
-IDENTIFIQUE A INTENÇÃO:
+        IDENTIFIQUE A INTENÇÃO:
 
-1. RETIRADA DE ITEM: "preciso", "quero", "peguei", "retirar"
-   Retorne: {{"intencao": "registrar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "confirmacao": "Texto natural com avisos se necessário"}}
+        1. RETIRADA DE ITEM: "preciso", "quero", "peguei", "retirar"
+        Retorne: {{"intention": "registrar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com avisos se necessário"}}
 
-2. CONSULTA ESTOQUE: "quanto tem", "quantos", "estoque"  
-   Retorne: {{"intencao": "consultar_estoque", "itens": [{{"item": "nome_item"}}], "confirmacao": "Texto natural com quantidade atual e localização"}}
+        2. CONSULTA ESTOQUE: "quanto tem", "quantos", "estoque"  
+        Retorne: {{"intention": "consultar_estoque", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com quantidade atual e localização"}}
 
-3. CONSULTA LOCALIZAÇÃO: "onde está", "qual gaveta", "localização"
-   Retorne: {{"intencao": "consultar_localizacao", "itens": [{{"item": "nome_item"}}], "confirmacao": "Texto natural com localização"}}
+        3. CONSULTA LOCALIZAÇÃO: "onde está", "qual gaveta", "localização"
+        Retorne: {{"intention": "consultar_localizacao", "itens": [{{"item": "nome_item"}}], "response": "Texto natural com localização"}}
 
-4. CANCELAR: "cancelar", "desistir"
-   Retorne: {{"intencao": "cancelar_registro", "confirmacao": "Texto natural"}}
+        4. CANCELAR: "cancelar", "desistir"
+        Retorne: {{"intention": "cancelar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural"}}
 
-5. ALERTA ESTOQUE: quando detectar item em estado crítico/baixo
-   Retorne: {{"intencao": "alerta_estoque", "confirmacao": "Texto natural com aviso"}}
+        5. ALERTA ESTOQUE: quando detectar item em estado crítico/baixo
+        Retorne: {{"intention": "alerta_estoque", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com aviso"}}
 
-6. NÃO ENTENDIDO: qualquer outra coisa
-   Retorne: {{"intencao": "nao_entendido", "confirmacao": "Não entendi. Pode reformular?"}}
+        6. NÃO ENTENDIDO: qualquer outra coisa
+        Retorne: {{"intention": "nao_entendido", "response": "Não entendi. Pode reformular?"}}
 
-REGRAS IMPORTANTES:
-- Normalize nomes (ex: "seringa 10ml" → "seringa_10ml")
-- Retorne APENAS JSON válido
-- Seja natural e amigável
-- Em caso de ambiguidade, pergunte especificações (ex: qual tipo de seringa?)
-- Se o item não existir no estoque, use intenção "nao_entendido"
-- SEMPRE verifique se retirada deixará estoque em estado crítico/baixo
-- Inclua avisos sobre localização quando relevante
-- Para consultas, inclua quantidade atual e localização
-- Detecte outliers (quantidades muito altas/baixas solicitadas)
+        7. CONFIRMAÇÃO: "confirmar", "sim", "claro"
+        Retorne: {{"intention": "confirmar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com confirmação"}}
 
-EXEMPLOS DE RESPOSTAS COM CONTEXTO:
-- Retirada normal: "Registrei 5 seringas de 10ml. Restam 45 unidades na gaveta B."
-- Retirada com aviso: "⚠️ ATENÇÃO: Retirar 20 máscaras N95 deixará apenas 15 unidades (abaixo do mínimo de 30). Confirma?"
-- Consulta: "Temos 150 seringas de 5ml disponíveis na gaveta B (estoque normal)."
-- Crítico: "🔴 ALERTA: Agulhas 21G estão em estado CRÍTICO - apenas 5 unidades restantes!"
+        REGRAS IMPORTANTES:
+        - Normalize nomes (ex: "seringa 10ml" → "seringa_10ml")
+        - Retorne APENAS JSON válido
+        - Seja natural e amigável
+        - Em caso de ambiguidade, pergunte especificações (ex: qual tipo de seringa?)
+        - Se o item não existir no estoque, avise o usuário
+        - SEMPRE verifique se retirada deixará estoque em estado crítico/baixo
+        - Inclua avisos sobre localização se existir e for relevante
+        - Para consultas, inclua quantidade atual e localização
+        - Detecte outliers (quantidades muito altas/baixas solicitadas)
+        - Confirmar retirada deve ser feita apenas quando você tiver certeza da quantidade e do item, e o usuário tiver confirmado a retirada. Depois disso, encerraremos a sessão e enviaremos a retirada.
 
-RESPONDA APENAS COM JSON:
-"""
-    
-    # 🔍 PRINT DO PROMPT COMPLETO
-    print("=" * 80)
-    print("PROMPT ENVIADO PARA O GEMINI:")
-    print("=" * 80)
-    print(prompt)
-    print("=" * 80)
+        EXEMPLOS DE RESPOSTAS COM CONTEXTO:
+        - Retirada normal: "Registrei 5 seringas de 10ml. Restam 45 unidades na gaveta B."
+        - Retirada com aviso: "⚠️ ATENÇÃO: Retirar 20 máscaras N95 deixará apenas 15 unidades (abaixo do mínimo de 30). Confirma?"
+        - Consulta: "Temos 150 seringas de 5ml disponíveis na gaveta B (estoque normal)."
+        - Crítico: "🔴 ALERTA: Agulhas 21G estão em estado CRÍTICO - apenas 5 unidades restantes!"
+
+        RESPONDA APENAS COM JSON:
+
+        Contexto da conversa:
+        {sess.history}
+        """
     
     try:
         chat = model.start_chat(history=[])
         response = chat.send_message(prompt)
-        logger.debug(f"Resposta bruta do Gemini: {response.text}")
         
         # Limpa a resposta
         clean_text = response.text.strip()
@@ -151,16 +189,18 @@ RESPONDA APENAS COM JSON:
             clean_text = clean_text[7:-3]
         elif clean_text.startswith('```'):
             clean_text = clean_text[3:-3]
-        
+
+        logger.debug(f"Resposta limpa do Gemini: {clean_text}")
+
         resultado = json.loads(clean_text)
-        logger.success(f"Comando interpretado com sucesso: {resultado.get('intencao', 'N/A')}")
+        logger.success(f"SessionID: {session_id} - Comando interpretado com sucesso: {resultado.get('intention', 'N/A')}")
         return resultado
         
     except Exception as e:
-        logger.error(f"Erro ao interpretar comando: {e}")
+        logger.error(f"Erro ao interpretar (sessão {session_id}): {e}")
         return {
-            "intencao": "nao_entendido",
-            "confirmacao": "Houve um erro no processamento. Pode repetir sua solicitação?"
+            "intention": "erro",
+            "response": "Houve um erro no processamento. Pode repetir sua solicitação?"
         }
 
 def process_action(resultado):
@@ -188,245 +228,6 @@ def process_action(resultado):
     
     return confirmacao
 
-# =====================
-# Chat integrado (StellaInteligente)
-# =====================
-class StellaInteligente:
-    """Chat inteligente com Stella usando o Gemini, mantendo histórico local (em memória)."""
-    
-    def __init__(self):
-        self.user_name = "Usuário"
-        self.pedidos_sessao = []  # Pedidos da sessão atual
-        # Instrução de sistema local + histórico local (não usa memória do chat Gemini)
-        self.system_instruction = (
-            "Você é Stella, assistente de almoxarifado hospitalar."
-            " Mantenha conversa natural e contínua, use o contexto da sessão,"
-            " seja objetiva, amigável e prestativa."
-        )
-        # Modelo básico; o contexto será injetado via prompt
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
-        # Histórico local de mensagens [{role: 'user'|'assistant', text: str}]
-        self.history: list[dict] = []
-
-    # -------- Deterministic estoque helpers --------
-    def _get_estoque(self):
-        try:
-            data = load_estoque_data()
-            return data.get('estoque', {})
-        except Exception:
-            return {}
-
-    def _normalize_item(self, nome: str) -> str | None:
-        t = (nome or '').lower().strip()
-        t = t.replace('-', ' ').replace('_', ' ')
-        # atalhos por palavras-chave
-        if 'seringa' in t and ('10' in t or '10ml' in t or '10 ml' in t):
-            return 'seringa_10ml'
-        if 'seringa' in t and ('5' in t or '5ml' in t or '5 ml' in t):
-            return 'seringa_5ml'
-        if 'agulha' in t and '21' in t:
-            return 'agulha_21g'
-        if 'agulha' in t and '10' in t:
-            return 'agulha_10g'
-        if 'n95' in t or 'máscara' in t or 'mascara' in t:
-            return 'mascara_n95'
-        if 'luva' in t:
-            return 'luva'
-        if 'gaze' in t:
-            return 'gaze'
-        # tentativa direta
-        key = t.replace(' ', '_')
-        return key or None
-
-    def _status_label(self, qtd: int | float, minimo: int | float, critico: int | float) -> str:
-        try:
-            if qtd <= critico:
-                return '🔴 CRÍTICO'
-            if qtd <= minimo:
-                return '🟡 BAIXO'
-            return '🟢 NORMAL'
-        except Exception:
-            return '🟢 NORMAL'
-
-    def _responder_consulta_estoque(self, itens: list[dict]) -> str:
-        estoque = self._get_estoque()
-        respostas = []
-        not_found = []
-        for it in itens or []:
-            nome = it.get('item') if isinstance(it, dict) else str(it)
-            key = self._normalize_item(nome)
-            dados = estoque.get(key or '')
-            if not dados:
-                not_found.append(nome)
-                continue
-            qtd = dados.get('quantidade_atual', 0)
-            un = dados.get('unidade', 'unidade')
-            loc = (dados.get('localizacao') or {}).get('gaveta', 'N/A')
-            minimo = dados.get('quantidade_minima', 0)
-            crit = dados.get('quantidade_critica', 0)
-            status = self._status_label(qtd, minimo, crit)
-            nome_full = dados.get('nome_completo', key)
-            respostas.append(f"Temos {qtd} {un} de {nome_full} na gaveta {loc} ({status}).")
-        if not_found:
-            disponiveis = ', '.join(sorted(estoque.keys())) or '—'
-            respostas.append(f"Itens não encontrados: {', '.join(not_found)}. Disponíveis: {disponiveis}.")
-        return ' '.join(respostas) if respostas else 'Não encontrei esses itens no estoque.'
-
-    def _responder_consulta_localizacao(self, itens: list[dict]) -> str:
-        estoque = self._get_estoque()
-        respostas = []
-        not_found = []
-        for it in itens or []:
-            nome = it.get('item') if isinstance(it, dict) else str(it)
-            key = self._normalize_item(nome)
-            dados = estoque.get(key or '')
-            if not dados:
-                not_found.append(nome)
-                continue
-            loc = dados.get('localizacao', {}) or {}
-            setor = loc.get('setor', '—')
-            prat = loc.get('prateleira', '—')
-            gav = loc.get('gaveta', '—')
-            nome_full = dados.get('nome_completo', key)
-            respostas.append(f"{nome_full} fica no Setor {setor}, Prateleira {prat}, Gaveta {gav}.")
-        if not_found:
-            disponiveis = ', '.join(sorted(estoque.keys())) or '—'
-            respostas.append(f"Itens não encontrados: {', '.join(not_found)}. Disponíveis: {disponiveis}.")
-        return ' '.join(respostas) if respostas else 'Não encontrei a localização solicitada.'
-
-    # -------- Histórico local + chat --------
-    def _build_history_text(self, max_messages: int = 12) -> str:
-        linhas = []
-        for msg in self.history[-max_messages:]:
-            role_name = self.user_name if msg.get('role') == 'user' else 'Stella'
-            linhas.append(f"{role_name}: {msg.get('text', '')}")
-        return "\n".join(linhas)
-
-    def _chat_with_local_context(self, user_message: str) -> str:
-        prompt = (
-            f"{self.system_instruction}\n\n"
-            f"Histórico da conversa (mais recente primeiro):\n{self._build_history_text()}\n\n"
-            f"{self.user_name}: {user_message}\n"
-            f"Stella: "
-        )
-        try:
-            response = self.model.generate_content(prompt)
-            resposta = (getattr(response, 'text', '') or '').strip()
-            if not resposta:
-                resposta = self.generate_natural_response(user_message)
-        except Exception as e:
-            logger.error(f"Erro ao gerar resposta com histórico local: {e}")
-            resposta = self.generate_natural_response(user_message)
-        # Atualiza histórico local
-        self.history.append({"role": "user", "text": user_message})
-        self.history.append({"role": "assistant", "text": resposta})
-        return resposta
-
-    # -------- Chat + roteamento de intenção --------
-    def process_with_context(self, user_message: str) -> str:
-        # 1) Tenta interpretar intenção primeiro (para evitar alucinações em consultas)
-        try:
-            resultado = command_interpreter(user_message)
-            intencao = (resultado or {}).get('intencao')
-            itens = (resultado or {}).get('itens', [])
-            if intencao == 'consultar_estoque':
-                resp = self._responder_consulta_estoque(itens)
-                # registra no histórico local
-                self.history.append({"role": "user", "text": user_message})
-                self.history.append({"role": "assistant", "text": resp})
-                return resp
-            if intencao == 'consultar_localizacao':
-                resp = self._responder_consulta_localizacao(itens)
-                self.history.append({"role": "user", "text": user_message})
-                self.history.append({"role": "assistant", "text": resp})
-                return resp
-            # Poderíamos tratar outras intenções aqui futuramente (registrar_retirada, etc.)
-        except Exception as e:
-            logger.debug(f"Falha na interpretação estruturada, usando chat: {e}")
-        
-        # 2) Fallback: conversa livre com histórico local (não usa memória do Gemini)
-        return self._chat_with_local_context(user_message)
-
-    def generate_natural_response(self, message: str) -> str:
-        message_lower = message.lower()
-        try:
-            history_len = len(self.history)
-        except Exception:
-            history_len = 0
-        
-        if any(g in message_lower for g in ["olá", "oi", "ola", "hey", "e aí"]):
-            return (f"Olá {self.user_name}! Sou a Stella, assistente do almoxarifado. Como posso ajudar você hoje?"
-                    if history_len <= 1 else "Oi! Em que mais posso ajudar?")
-        if any(w in message_lower for w in ["tudo bem", "como vai", "como está"]):
-            return "Estou muito bem, obrigada! Pronta para ajudar com o almoxarifado. E você, como está?"
-        if any(w in message_lower for w in ["nome", "quem é", "você é"]):
-            return "Sou a Stella, sua assistente virtual do almoxarifado hospitalar. Estou aqui para ajudar com materiais e suprimentos!"
-        if any(w in message_lower for w in ["pedido", "pedi", "solicitei", "último"]):
-            if self.pedidos_sessao:
-                return f"Você pediu: {', '.join(self.pedidos_sessao)}. Precisa de mais alguma coisa?"
-            return "Ainda não vejo pedidos nesta conversa. O que você precisa?"
-        if any(w in message_lower for w in ["obrigad", "valeu", "thanks"]):
-            return "De nada! Foi um prazer ajudar. Se precisar de mais alguma coisa, estarei aqui!"
-        return "Entendi! Como assistente do almoxarifado, posso ajudar com seringas, luvas, gazes e outros materiais. O que você precisa?"
-
-    def show_history(self):
-        print("\n" + "="*50)
-        print("📝 HISTÓRICO DA CONVERSA (local)")
-        print("="*50)
-        history = self.history or []
-        for i, msg in enumerate(history, 1):
-            role = msg.get('role', 'assistant')
-            role_name = self.user_name if role == 'user' else 'Stella'
-            content_text = msg.get('text', '')
-            content = (content_text[:100] + "...") if len(content_text) > 100 else content_text
-            print(f"{i:2d}. {role_name}: {content}")
-        print(f"\n💬 Total: {len(history)} mensagens")
-        print("="*50)
-
-    def show_pedidos(self):
-        print("\n" + "="*30)
-        print("📦 PEDIDOS DESTA SESSÃO")
-        print("="*30)
-        if self.pedidos_sessao:
-            for i, pedido in enumerate(self.pedidos_sessao, 1):
-                print(f"{i}. {pedido}")
-        else:
-            print("Nenhum pedido registrado ainda.")
-        print("="*30)
-
-    def start_chat(self):
-        print("🧠 STELLA INTELIGENTE - GEMINI + CONTEXTO LOCAL")
-        print("=" * 50)
-        self.user_name = input("Seu nome: ").strip() or "Usuário"
-        print(f"\n✅ Olá {self.user_name}! Sistema inteligente ativo.")
-        print("Digite 'sair' para encerrar, 'historico' para ver conversa\n")
-        initial_message = (f"Olá {self.user_name}! Sou a Stella, sua assistente inteligente do almoxarifado. "
-                           f"Como posso ajudar você hoje?")
-        print(f"Stella: {initial_message}")
-        # Registra mensagem inicial no histórico
-        self.history.append({"role": "assistant", "text": initial_message})
-        try:
-            while True:
-                user_input = input(f"\n{self.user_name}: ").strip()
-                if not user_input:
-                    continue
-                if user_input.lower() in ['sair', 'exit', 'tchau']:
-                    print("Stella: Até mais! Foi um prazer conversar com você! 👋")
-                    break
-                if user_input.lower() == 'historico':
-                    self.show_history(); continue
-                if user_input.lower() == 'pedidos':
-                    self.show_pedidos(); continue
-                print("🧠 Stella está processando...")
-                ai_response = self.process_with_context(user_input)
-                print(f"Stella: {ai_response}")
-        except KeyboardInterrupt:
-            print("\n\nTchau! 👋")
-        except Exception as e:
-            print(f"\n❌ Erro: {e}")
-
-# Novo fluxo principal (RabbitMQ removido)
 if __name__ == "__main__":
     # Fallback: inicia chat interativo integrado
-    chat = StellaInteligente()
-    chat.start_chat()
+    pass
