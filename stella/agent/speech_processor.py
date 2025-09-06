@@ -39,6 +39,7 @@ model = genai.GenerativeModel(MODEL_ID, system_instruction=SYSTEM_INSTRUCTION)
 _SESSIONS: Dict[str, Any] = {}  # Any porque ChatSession não está em genai.types
 _LAST_SEEN: Dict[str, float] = {}
 _SESSION_TTL_SECONDS = 3 * 60  # 3 minutos
+ACTIVE_SESSION_ID: Optional[str] = None  # sessão ativa exclusiva
 
 def _gc_sessions():
     """Coleta sessões inativas (TTL)."""
@@ -84,6 +85,16 @@ def end_session(session_id: str) -> bool:
     logger.warning(f"⚠️ Sessão não encontrada para encerrar: {session_id}")
     return False
 
+def switch_active_session(session_id: str):
+    """Garante sessão exclusiva: ao trocar de session_id, apaga histórico anterior."""
+    global ACTIVE_SESSION_ID
+    if ACTIVE_SESSION_ID and ACTIVE_SESSION_ID != session_id:
+        for sid in list(_SESSIONS.keys()):
+            if sid != session_id:
+                end_session(sid)
+        logger.info(f"Alternando sessão ativa de {ACTIVE_SESSION_ID} para {session_id}")
+    ACTIVE_SESSION_ID = session_id
+
 def load_estoque_data():
     try:
         # Caminho único e absoluto para o arquivo de estoque
@@ -103,11 +114,9 @@ def load_estoque_data():
         return {"estoque": {}}
 
 def command_interpreter(comando: str, session_id: str):
+    switch_active_session(session_id)
     sess = get_or_create_session(session_id)
-    estoque_data = load_estoque_data()
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    estoque_data = load_estoque_data()
-    
+    estoque_data = load_estoque_data()    
     estoque_completo = estoque_data.get('estoque', {})
     
     # Formatar estoque de forma legível para a IA
@@ -216,8 +225,7 @@ def command_interpreter(comando: str, session_id: str):
         """
     
     try:
-        chat = model.start_chat(history=[])
-        response = chat.send_message(prompt)
+        response = sess.send_message(prompt)
         
         # Limpa a resposta
         clean_text = response.text.strip()
