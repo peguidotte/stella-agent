@@ -1,81 +1,129 @@
 """
 Serviço de processamento de voz e interação com IA
 """
-import json
+import asyncio
+from datetime import datetime
 from loguru import logger
-from typing import Dict, Any, Optional
-from stella.api.models.responses import StandardResponse
+from pydantic import ValidationError
+from stella.api.models import SpeechRequest, SpeechResponse, StellaSpeechResponse
 from stella.agent.speech_processor import command_interpreter
+from stella.websocket.websocket_manager import send_event, get_default_channel
 
 class SpeechService:
     """Serviço responsável pelo processamento de voz e interação com IA"""
     
-    def __init__(self, websocket_manager):
-        self.websocket_manager = websocket_manager
-    
-    def process_speech_input(self, session_id: str, text: str) -> StandardResponse:
+    @staticmethod
+    async def process_speech_async(request: SpeechRequest):
         """
-        Processa entrada de voz usando IA com contexto de sessão
-        
-        Args:
-            session_id: ID da sessão do usuário
-            text: Texto a ser processado
-            
-        Returns:
-            StandardResponse com resultado do processamento
+        Processa entrada de voz assincronamente e envia via WebSocket
         """
         try:
-            logger.info(f"🗣️ Processando fala para sessão {session_id}: {text[:50]}...")
+            logger.info(f"🗣️ Processando async | Sessão: {request.session_id} | Corr: {request.correlation_id}")
             
-            # Processa usando a IA com contexto de sessão
-            ai_response = command_interpreter(text, session_id)
+            ai_response = await asyncio.to_thread(
+                command_interpreter,
+                request.data.text,
+                request.session_id
+            )
             
-            # Envia resposta via WebSocket
             if ai_response:
-                channel_name = f"private-session-{session_id}"
-                self.websocket_manager.send_message(
-                    channel_name,
-                    "ai_response",
-                    {
-                        "message": ai_response,
-                        "timestamp": self._get_current_timestamp(),
-                        "session_id": session_id
-                    }
-                )
-                logger.success(f"✅ Resposta enviada para sessão {session_id}")
-            
-            return StandardResponse(
-                success=True,
-                message="Fala processada e resposta enviada",
-                data={"ai_response": ai_response}
-            )
-            
+                
+                try:
+                    speech_response = SpeechResponse(
+                        session_id=request.session_id,
+                        correlation_id=request.correlation_id,
+                        timestamp=datetime.now(),
+                        data=ai_response 
+                    )
+                    
+                    send_event(
+                        channel=get_default_channel(),
+                        event="server-speech-output",
+                        data=speech_response.model_dump()
+                    )
+                    
+                    logger.success(f"✅ Resposta validada e enviada | Sessão: {request.session_id}")
+                    
+                except ValidationError as ve:
+                    logger.error(f"❌ Erro de validação na resposta: {ve}")
+                    await SpeechService._send_validation_error(request.session_id, request.correlation_id, ve)
+
+            else:
+                logger.warning(f"⚠️ IA retornou resposta vazia")
+                await SpeechService._send_empty_response(request.session_id, request.correlation_id)
+
         except Exception as e:
-            logger.error(f"❌ Erro ao processar fala: {e}")
-            error_response = f"Desculpe, ocorreu um erro ao processar sua solicitação: {str(e)}"
-            
-            # Envia erro via WebSocket se possível
-            try:
-                channel_name = f"private-session-{session_id}"
-                self.websocket_manager.send_message(
-                    channel_name,
-                    "ai_error",
-                    {
-                        "error": error_response,
-                        "timestamp": self._get_current_timestamp(),
-                        "session_id": session_id
-                    }
+            logger.error(f"❌ Erro no processamento: {e}")
+            await SpeechService._send_processing_error(request.session_id, request.correlation_id, e)
+
+    @staticmethod
+    async def _send_validation_error(session_id: str, correlation_id: str, validation_error: ValidationError):
+        """Envia erro de validação via WebSocket"""
+        try:
+            error_response = SpeechResponse(
+                session_id=session_id,
+                correlation_id=correlation_id,
+                timestamp=datetime.now(),
+                data=StellaSpeechResponse(
+                    intention="error",
+                    response="Desculpe, houve um erro na validação da resposta.",
+                    stella_analysis="error",
+                    reason=f"Validation error: {str(validation_error)}"
                 )
-            except:
-                pass  # Se falhar, pelo menos retorna erro via HTTP
-            
-            return StandardResponse(
-                success=False,
-                message="Erro ao processar fala",
-                data={"error": str(e)}
             )
+            
+            send_event(
+                channel=get_default_channel(),
+                event="server-speech-output",
+                data=error_response.model_dump()
+            )
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar validation error: {e}")
     
-    def _get_current_timestamp(self) -> str:
-        """Retorna timestamp atual em formato ISO"""
-        from datetime import datetime
-        return datetime.now().isoformat()
+    @staticmethod
+    async def _send_empty_response(session_id: str, correlation_id: str):
+        """Envia resposta para IA vazia"""
+        try:
+            empty_response = SpeechResponse(
+                session_id=session_id,
+                correlation_id=correlation_id,
+                timestamp=datetime.now(),
+                data=StellaSpeechResponse(
+                    intention="error",
+                    response="Desculpe, não consegui processar sua solicitação.",
+                    stella_analysis="error",
+                    reason="IA retornou resposta vazia"
+                )
+            )
+
+            send_event(
+                channel=get_default_channel(),
+                event="server-speech-output",
+                data=empty_response.model_dump()
+            )
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar empty response: {e}")
+    
+    @staticmethod
+    async def _send_processing_error(session_id: str, correlation_id: str, error: Exception):
+        """Envia erro de processamento via WebSocket"""
+        try:
+            error_response = SpeechResponse(
+                session_id=session_id,
+                correlation_id=correlation_id,
+                timestamp=datetime.now(),
+                data=StellaSpeechResponse(
+                    intention="error",
+                    response="Desculpe, ocorreu um erro interno. Tente novamente.",
+                    stella_analysis="error",
+                    reason=f"Processing error: {str(error)}"
+                )
+            )
+
+            send_event(
+                channel=get_default_channel(),
+                event="server-speech-error",
+                data=error_response.model_dump()
+            )
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar processing error: {e}")

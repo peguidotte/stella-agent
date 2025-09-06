@@ -3,25 +3,18 @@ Rotas de gerenciamento de sessões
 """
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from stella.api.models.requests import SessionEndRequest
-from stella.api.models.responses import StandardResponse, SessionStartResponse, HealthResponse
+from stella.api.models import SessionEndRequest, SessionStartRequest, SessionEndResponse, SessionStartResponse
 from stella.api.services.session import SessionService
 
-def create_session_router(websocket_manager) -> APIRouter:
+def create_session_router() -> APIRouter:
     """
-    Cria router de sessões com dependência do WebSocketManager
-    
-    Args:
-        websocket_manager: Instância do WebSocketManager
-        
-    Returns:
-        APIRouter configurado para gerenciamento de sessões
+    Cria API router de sessões
     """
     router = APIRouter(prefix="/session", tags=["Gerenciamento de Sessões"])
-    session_service = SessionService(websocket_manager)
+    session_service = SessionService()
     
     @router.post("/start", response_model=SessionStartResponse)
-    async def start_session():
+    async def start_session(request: SessionStartRequest):
         """
         Inicia uma nova sessão de usuário
         
@@ -31,12 +24,7 @@ def create_session_router(websocket_manager) -> APIRouter:
         try:
             logger.info("🚀 Solicitação para iniciar nova sessão")
             
-            result = session_service.start_new_session()
-            
-            if result.success:
-                logger.success(f"✅ Sessão criada: {result.data.get('session_id')}")
-            else:
-                logger.error(f"❌ Falha ao criar sessão: {result.message}")
+            result = session_service.start_new_session(request)
             
             return result
             
@@ -47,7 +35,7 @@ def create_session_router(websocket_manager) -> APIRouter:
                 detail=f"Erro interno ao iniciar sessão: {str(e)}"
             )
     
-    @router.post("/end", response_model=StandardResponse)
+    @router.post("/end", response_model=SessionEndResponse)
     async def end_session(request: SessionEndRequest):
         """
         Finaliza uma sessão específica
@@ -56,7 +44,7 @@ def create_session_router(websocket_manager) -> APIRouter:
             request: Dados da solicitação (session_id)
             
         Returns:
-            StandardResponse confirmando o encerramento
+            SessionEndResponse confirmando o encerramento
         """
         try:
             logger.info(f"🔚 Solicitação para encerrar sessão: {request.session_id}")
@@ -80,39 +68,5 @@ def create_session_router(websocket_manager) -> APIRouter:
                 status_code=500,
                 detail=f"Erro interno ao encerrar sessão: {str(e)}"
             )
-    
-    @router.get("/health", response_model=HealthResponse)
-    async def health_check():
-        """
-        Endpoint de verificação de saúde da API
-        
-        Returns:
-            HealthResponse com status da API
-        """
-        try:
-            # Faz limpeza de sessões expiradas como parte do health check
-            cleaned_count = session_service.cleanup_expired_sessions()
             
-            return HealthResponse(
-                success=True,
-                message="API funcionando normalmente",
-                data={
-                    "status": "healthy",
-                    "expired_sessions_cleaned": cleaned_count,
-                    "timestamp": session_service._get_current_timestamp()
-                }
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ Erro no health check: {e}")
-            return HealthResponse(
-                success=False,
-                message="Problemas detectados na API",
-                data={
-                    "status": "unhealthy",
-                    "error": str(e),
-                    "timestamp": session_service._get_current_timestamp()
-                }
-            )
-    
     return router
