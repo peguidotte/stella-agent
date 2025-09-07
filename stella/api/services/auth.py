@@ -24,7 +24,7 @@ class AuthService:
         try:
             logger.info(f"🔐 Autenticando canal: {channel_name} para socket: {socket_id}")
             
-            # Aqui você poderia validar o usuário, mas no teste liberamos;ç
+            # Aqui você poderia validar o usuário, mas no teste liberamos
             auth_data = authenticate_channel(channel_name, socket_id)
 
             logger.success(f"✅ Canal {channel_name} autenticado com sucesso")
