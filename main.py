@@ -18,7 +18,7 @@ from stella.api.routes import (
 # Configuração da aplicação FastAPI
 app = FastAPI(
     title="Stella Agent API",
-    description="Sistema de Assistente Virtual com IA, reconhecimento facial e comunicação WebSocket",
+    description="Sistema de Assistente Virtual com IA, reconhecimento facial e comunicação WebSocket. Para ter acesso as responses em chamadas que envolvem websocket, acesse o markdown 'AYNC_RESPONSES' na raiz do projeto.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"

@@ -17,13 +17,7 @@ def create_speech_router() -> APIRouter:
     @router.post("/process", response_model=APIBaseResponse)
     async def process_speech(request: SpeechRequest):
         """
-        Processa entrada de voz usando IA com contexto de sessão, assíncronamente envia resultado via WebSocket e retorna confirmação imediata
-        
-        Args:
-            request: Dados da Request
-            
-        Returns:
-            APIBaseResponse com resultado do processamento
+        Processa entrada de voz usando IA com contexto de sessão, no retorno HTTP aceita a solicitação e o resultado é enviado via WebSocket
         """
 
         try:

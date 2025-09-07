@@ -1,7 +1,7 @@
 """
 Modelo Pydantic para endpoint "speech" da API
 """
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from typing import Optional
 import base64
 from stella.api.models.generic import BaseRequest, BaseResponse

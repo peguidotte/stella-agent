@@ -2,8 +2,6 @@
 Modelos Pydantic para endpoints "auth" da API Stella
 """
 from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import datetime
 from fastapi import Form
 
 class AuthRequest(BaseModel):
@@ -24,6 +22,4 @@ class AuthRequest(BaseModel):
         )
 
 class AuthResponse(BaseModel):
-    success: bool = Field(..., description="Indica se a autenticação foi bem-sucedida")
-    message: Optional[str] = Field(..., description="Mensagem descritiva")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp da resposta")
+    auth: str = Field(..., description="Token de autenticação Pusher")

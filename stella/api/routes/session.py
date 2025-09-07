@@ -16,10 +16,7 @@ def create_session_router() -> APIRouter:
     @router.post("/start", response_model=SessionStartResponse)
     async def start_session(request: SessionStartRequest):
         """
-        Inicia uma nova sessão de usuário
-        
-        Returns:
-            SessionStartResponse com dados da nova sessão
+        Inicia uma nova sessão
         """
         try:
             logger.info("🚀 Solicitação para iniciar nova sessão")
@@ -39,12 +36,6 @@ def create_session_router() -> APIRouter:
     async def end_session(request: SessionEndRequest):
         """
         Finaliza uma sessão específica
-        
-        Args:
-            request: Dados da solicitação (session_id)
-            
-        Returns:
-            SessionEndResponse confirmando o encerramento
         """
         try:
             logger.info(f"🔚 Solicitação para encerrar sessão: {request.session_id}")

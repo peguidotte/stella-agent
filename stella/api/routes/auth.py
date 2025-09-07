@@ -1,21 +1,14 @@
 """
 Rotas de autenticação Pusher
 """
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from loguru import logger
-from stella.api.models import AuthRequest, AuthResponse
+from stella.api.models import AuthRequest
 from stella.api.services.auth import AuthService
 
 def create_auth_router() -> APIRouter:
     """
-    Cria router de autenticação com dependência do WebSocketManager
-    
-    Args:
-        websocket_manager: Instância do WebSocketManager
-        
-    Returns:
-        APIRouter configurado para autenticação
+    Cria API router de autenticação com Pusher
     """
     router = APIRouter(prefix="/auth", tags=["Autenticação"])
     auth_service = AuthService()
@@ -23,13 +16,7 @@ def create_auth_router() -> APIRouter:
     @router.post("/pusher")
     async def authenticate_pusher(request: AuthRequest = Depends(AuthRequest.as_form)):
         """
-        Endpoint para autenticação de canais privados do Pusher
-        
-        Args:
-            request: Dados de autenticação (channel_name, socket_id)
-            
-        Returns:
-            AuthResponse com dados de autenticação ou erro
+        Endpoint para autenticação de canal privado do Pusher
         """
         try:
             logger.info(f"🔐 Solicitação de autenticação para canal: {request.channel_name}")

@@ -16,13 +16,7 @@ def create_face_router() -> APIRouter:
     @router.post("/recognize", response_model=APIBaseResponse)
     async def recognize_face(request: FaceAuthRequest):
         """
-        Processa reconhecimento facial
-        
-        Args:
-            request: Dados da solicitação (session_id, image_data)
-            
-        Returns:
-            FaceAuthResponse com resultado do reconhecimento
+        Processa reconhecimento facial, no retorno HTTP aceita a solicitação e o resultado é enviado via WebSocket
         """
         try:
             logger.info(f"👤 Processando reconhecimento facial para sessão: {request.session_id}")
@@ -49,13 +43,7 @@ def create_face_router() -> APIRouter:
     @router.post("/register", response_model=APIBaseResponse)
     async def register_face(request: FaceCadRequest):
         """
-        Cadastra um novo usuário via reconhecimento facial
-        
-        Args:
-            request: Dados da solicitação (name, image_data)
-            
-        Returns:
-            FaceCadResponse com resultado do cadastro
+        Cadastra um novo usuário via reconhecimento facial, no retorno HTTP aceita a solicitação e o resultado é enviado via WebSocket
         """
         try:
             logger.info(f"🆕 Cadastrando novo usuário: {request.name}")
