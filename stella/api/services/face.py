@@ -28,7 +28,7 @@ class FaceService:
             logger.info(f"👤 Processando reconhecimento facial para sessão {request.session_id}")
 
             # Processa reconhecimento facial
-            recognition_result = FaceRecognizer.validate_face(request.image_data)
+            recognition_result = FaceRecognizer.validate_face(request.encoding)
 
             # Envia resultado via WebSocket
             channel_name = get_default_channel()
