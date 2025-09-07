@@ -63,11 +63,27 @@ def get_or_create_session(session_id: str) -> Any:
     _gc_sessions()
     return sess
 
-def end_session(session_id: str):
-    """Encerrar sessão explicitamente (opcional)."""
-    _SESSIONS.pop(session_id, None)
-    _LAST_SEEN.pop(session_id, None)
-    logger.info(f"Sessão encerrada: {session_id}")
+def end_session(session_id: str) -> bool:
+    """
+    Encerra uma sessão específica do Gemini
+    
+    Args:
+        session_id: ID da sessão para encerrar
+        
+    Returns:
+        True se sessão foi encontrada e removida
+    """
+    global _SESSIONS, _LAST_SEEN
+    
+    if session_id in _SESSIONS:
+        del _SESSIONS[session_id]
+        if session_id in _LAST_SEEN:
+            del _LAST_SEEN[session_id]
+        logger.info(f"🗑️ Sessão Gemini encerrada: {session_id}")
+        return True
+    
+    logger.warning(f"⚠️ Sessão não encontrada para encerrar: {session_id}")
+    return False
 
 def switch_active_session(session_id: str):
     """Garante sessão exclusiva: ao trocar de session_id, apaga histórico anterior."""
@@ -135,57 +151,77 @@ def command_interpreter(comando: str, session_id: str):
         ESTOQUE COMPLETO DISPONÍVEL:
         {estoque_formatado}
 
-        CONTEXTO IMPORTANTE:
-        - Última atualização: {estoque_data.get('ultima_atualizacao', 'N/A')}
-        - Status 🔴 CRÍTICO = quantidade <= crítica
-        - Status 🟡 BAIXO = quantidade <= mínima  
-        - Status 🟢 NORMAL = quantidade > mínima
+        RESPONDA EXATAMENTE COM ESTE FORMATO JSON:
+        {{
+            "intention": "ESCOLHA_UM_VALOR_VÁLIDO",
+            "items": [{{"item": "nome_item", "quantidade": numero}}],
+            "response": "resposta natural e amigável da Stella",
+            "stella_analysis": "ESCOLHA_UM_VALOR_VÁLIDO",
+            "reason": "justificativa opcional"
+        }}
 
-        IDENTIFIQUE A INTENÇÃO:
+        VALORES VÁLIDOS PARA "intention":
+        - "withdraw_request" = usuário quer retirar item
+        - "withdraw_confirm" = usuário confirmou retirada 
+        - "doubt" = usuário tem dúvida/pergunta
+        - "stock_query" = usuário quer consultar estoque
+        - "not_understood" = não entendi o comando
 
-        1. RETIRADA DE ITEM: "preciso", "quero", "peguei", "retirar"
-        Retorne: {{"intention": "registrar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com avisos se necessário"}}
-
-        2. CONSULTA ESTOQUE: "quanto tem", "quantos", "estoque"  
-        Retorne: {{"intention": "consultar_estoque", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com quantidade atual e localização"}}
-
-        3. CONSULTA LOCALIZAÇÃO: "onde está", "qual gaveta", "localização"
-        Retorne: {{"intention": "consultar_localizacao", "itens": [{{"item": "nome_item"}}], "response": "Texto natural com localização"}}
-
-        4. CANCELAR: "cancelar", "desistir"
-        Retorne: {{"intention": "cancelar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural"}}
-
-        5. ALERTA ESTOQUE: quando detectar item em estado crítico/baixo
-        Retorne: {{"intention": "alerta_estoque", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com aviso"}}
-
-        6. NÃO ENTENDIDO: qualquer outra coisa
-        Retorne: {{"intention": "nao_entendido", "response": "Não entendi. Pode reformular?"}}
-
-        7. CONFIRMAÇÃO: "confirmar", "sim", "claro"
-        Retorne: {{"intention": "confirmar_retirada", "itens": [{{"item": "nome_item", "quantidade": numero}}], "response": "Texto natural com confirmação"}}
+        VALORES VÁLIDOS PARA "stella_analysis":
+        - "normal" = operação normal
+        - "low_stock_alert" = estoque baixo (quantidade <= mínima)
+        - "critical_stock_alert" = estoque crítico (quantidade <= crítica)
+        - "outlier_withdraw_request" = quantidade solicitada muito alta/baixa
+        - "ambiguous" = comando ambíguo, precisa esclarecimento
+        - "not_understood" = não consegui entender
 
         REGRAS IMPORTANTES:
+        - Use APENAS os valores listados acima
         - Normalize nomes (ex: "seringa 10ml" → "seringa_10ml")
         - Retorne APENAS JSON válido
         - Seja natural e amigável
-        - Em caso de ambiguidade, pergunte especificações (ex: qual tipo de seringa?)
-        - Se o item não existir no estoque, avise o usuário
-        - SEMPRE verifique se retirada deixará estoque em estado crítico/baixo
-        - Inclua avisos sobre localização se existir e for relevante
-        - Para consultas, inclua quantidade atual e localização
-        - Detecte outliers (quantidades muito altas/baixas solicitadas)
-        - Confirmar retirada deve ser feita apenas quando você tiver certeza da quantidade e do item, e o usuário tiver confirmado a retirada. Depois disso, encerraremos a sessão e enviaremos a retirada.
+        - Verifique se retirada deixará estoque crítico/baixo
+        - Para ambiguidade, use intention="doubt" e stella_analysis="ambiguous"
 
-        EXEMPLOS DE RESPOSTAS COM CONTEXTO:
-        - Retirada normal: "Registrei 5 seringas de 10ml. Restam 45 unidades na gaveta B."
-        - Retirada com aviso: "⚠️ ATENÇÃO: Retirar 20 máscaras N95 deixará apenas 15 unidades (abaixo do mínimo de 30). Confirma?"
-        - Consulta: "Temos 150 seringas de 5ml disponíveis na gaveta B (estoque normal)."
-        - Crítico: "🔴 ALERTA: Agulhas 21G estão em estado CRÍTICO - apenas 5 unidades restantes!"
+        EXEMPLOS CORRETOS:
+        
+        Comando: "Preciso de 5 seringas"
+        {{
+            "intention": "withdraw_request",
+            "items": [{{"item": "seringa_10ml", "quantidade": 5}}],
+            "response": "Você quer 5 seringas de 10ml ou 5ml? Temos ambas disponíveis.",
+            "stella_analysis": "ambiguous",
+            "reason": "Tipo de seringa não especificado"
+        }}
 
-        RESPONDA APENAS COM JSON:
+        Comando: "Confirmo 5 seringas 10ml"
+        {{
+            "intention": "withdraw_confirm", 
+            "items": [{{"item": "seringa_10ml", "quantidade": 5}}],
+            "response": "Registrei a retirada de 5 seringas de 10ml. Restam 45 unidades na gaveta B.",
+            "stella_analysis": "normal"
+        }}
 
-        Contexto da conversa:
+        Comando: "Quanto tem de máscaras?"
+        {{
+            "intention": "stock_query",
+            "items": [{{"item": "mascara_n95", "quantidade": 0}}],
+            "response": "Temos 25 máscaras N95 disponíveis na gaveta A (estoque baixo - mínimo é 30).",
+            "stella_analysis": "low_stock_alert"
+        }}
+
+        Comando: "blablabla"
+        {{
+            "intention": "not_understood",
+            "items": [],
+            "response": "Desculpe, não entendi. Você pode repetir ou perguntar sobre retiradas ou consultas de estoque?",
+            "stella_analysis": "not_understood"
+        }}
+
+        CONTEXTO DA CONVERSA:
         {sess.history}
+
+        RESPONDA APENAS COM JSON VÁLIDO:
         """
     
     try:
@@ -201,39 +237,30 @@ def command_interpreter(comando: str, session_id: str):
         logger.debug(f"Resposta limpa do Gemini: {clean_text}")
 
         resultado = json.loads(clean_text)
-        logger.success(f"SessionID: {session_id} - Comando interpretado com sucesso: {resultado.get('intention', 'N/A')}")
+        
+        # ✅ VALIDAÇÃO ADICIONAL DOS ENUMS
+        valid_intentions = ["withdraw_request", "withdraw_confirm", "doubt", "stock_query", "not_understood"]
+        valid_analyses = ["normal", "low_stock_alert", "critical_stock_alert", "outlier_withdraw_request", "ambiguous", "not_understood"]
+        
+        if resultado.get("intention") not in valid_intentions:
+            logger.warning(f"IA retornou intention inválida: {resultado.get('intention')}")
+            resultado["intention"] = "not_understood"
+            
+        if resultado.get("stella_analysis") not in valid_analyses:
+            logger.warning(f"IA retornou stella_analysis inválida: {resultado.get('stella_analysis')}")
+            resultado["stella_analysis"] = "not_understood"
+        
+        logger.success(f"SessionID: {session_id} - Comando interpretado: {resultado.get('intention', 'N/A')}")
         return resultado
         
     except Exception as e:
         logger.error(f"Erro ao interpretar (sessão {session_id}): {e}")
         return {
-            "intention": "erro",
-            "response": "Houve um erro no processamento. Pode repetir sua solicitação?"
+            "intention": "not_understood",
+            "items": [],
+            "response": "Houve um erro no processamento. Pode repetir sua solicitação?",
+            "stella_analysis": "not_understood"
         }
-
-def process_action(resultado):
-    if not resultado:
-        return "Comando não reconhecido."
-    
-    intencao = resultado.get('intention')
-    itens = resultado.get('itens', [])
-    confirmacao = resultado.get('response', '')
-    
-    print(f"Intenção identificada: {intencao}")
-    if itens:
-        print(f"Itens processados: {itens}")
-    
-    if intencao == 'registrar_retirada':
-        # TODO: Validar estoque, verificar outliers, preparar log para o sistema
-        pass
-    elif intencao == 'consultar_estoque':
-        # TODO: Consultar banco de dados de estoque
-        pass
-    elif intencao == 'cancelar_retirada':
-        # TODO: Cancelar registro pendente
-        pass
-    
-    return confirmacao
 
 if __name__ == "__main__":
     # Fallback: inicia chat interativo integrado

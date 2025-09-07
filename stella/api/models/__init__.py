@@ -2,30 +2,61 @@
 Modelos Pydantic para validação de requests e responses da API Stella
 """
 
-from stella.api.models.requests import (
-    SpeechData,
+from stella.api.models.speech import (
+    SpeechResponse,
+    UserIntentions,
+    StellaAnalysis,
+    StellaSpeechResponse,
     SpeechRequest,
-    FaceData,
-    FaceRequest,
-    SessionEndRequest
+    SpeechDataRequest
 )
 
-from stella.api.models.responses import (
-    StandardResponse,
+from stella.api.models.face import (
+    FaceAuthRequest,
+    FaceAuthResponse,
+    FaceCadResponse,
+    FaceCadRequest
+)
+
+from stella.api.models.auth import (
+    AuthRequest,
+    AuthResponse
+)
+
+from stella.api.models.session import (
+    SessionStartRequest,
     SessionStartResponse,
+    SessionEndRequest,
     SessionEndResponse
 )
 
+from stella.api.models.generic import APIBaseResponse
+
 __all__ = [
-    # Request models
-    "SpeechData",
-    "SpeechRequest", 
-    "FaceData",
-    "FaceRequest",
-    "SessionEndRequest",
+    # Speech models
+    "SpeechRequest",
+    "SpeechResponse",
+    "StellaSpeechResponse",
+    "StellaAnalysis",
+    "UserIntentions",
+    "SpeechDataRequest",
+
+    # Face models
+    "FaceAuthRequest",
+    "FaceAuthResponse",
+    "FaceCadRequest",
+    "FaceCadResponse",
     
-    # Response models
-    "StandardResponse",
+    # Auth models
+    "AuthRequest",
+    "AuthResponse",
+    
+    # Session models
+    "SessionStartRequest",
     "SessionStartResponse",
+    "SessionEndRequest",
     "SessionEndResponse"
+    
+    # Generic models
+    "APIBaseResponse"
 ]

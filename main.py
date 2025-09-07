@@ -8,8 +8,6 @@ from loguru import logger
 import os
 from datetime import datetime
 
-# Importações dos componentes da API
-from stella.websocket.websocket_manager import WebSocketManager
 from stella.api.routes import (
     create_auth_router,
     create_speech_router,
@@ -35,14 +33,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Inicialização do WebSocket Manager
-websocket_manager = WebSocketManager()
-
 # Inclusão das rotas organizadas
-app.include_router(create_auth_router(websocket_manager))
-app.include_router(create_speech_router(websocket_manager))
-app.include_router(create_face_router(websocket_manager))
-app.include_router(create_session_router(websocket_manager))
+app.include_router(create_auth_router())
+app.include_router(create_speech_router())
+app.include_router(create_face_router())
+app.include_router(create_session_router())
 
 @app.get("/", tags=["Status"])
 async def root():
@@ -57,21 +52,15 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "description": "Sistema de Assistente Virtual com IA",
-        "features": {
-            "pusher_websocket": "Comunicação em tempo real",
-            "gemini_ai": "Processamento de linguagem natural",
-            "face_recognition": "Reconhecimento facial",
-            "session_management": "Gerenciamento de sessões com contexto"
-        },
         "pusher_cluster": os.getenv('PUSHER_CLUSTER', 'us2'),
         "endpoints": {
             "docs": "/docs",
-            "health": "/session/health",
             "auth": "/auth/pusher",
             "session_start": "/session/start",
             "session_end": "/session/end",
             "speech_process": "/speech/process",
-            "face_recognize": "/face/recognize"
+            "face_recognize": "/face/recognize",
+            "face_register": "/face/register"
         },
         "timestamp": datetime.now().isoformat()
     }
@@ -84,13 +73,13 @@ if __name__ == "__main__":
     logger.info("🔍 Redoc: http://localhost:8000/redoc")
     logger.info("💻 Endpoints principais:")
     logger.info("   POST /session/start - Iniciar nova sessão")
+    logger.info("   POST /session/end - Encerrar sessão")
     logger.info("   POST /speech/process - Processar fala")
     logger.info("   POST /face/recognize - Reconhecimento facial")
+    logger.info("   POST /face/register - Cadastrar novo usuário facial")
     logger.info("   POST /auth/pusher - Autenticação Pusher")
-    logger.info("   GET /session/health - Status da API")
     logger.info("")
     logger.info("🔄 Fluxo: HTTP POST → IA/Processamento → WebSocket Response")
-    logger.info("📡 WebSocket: Pusher channels para comunicação em tempo real")
 
     try:
         uvicorn.run(

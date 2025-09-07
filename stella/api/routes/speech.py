@@ -1,62 +1,55 @@
 """
 Rotas de processamento de voz
 """
+
+import asyncio
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from stella.api.models.requests import SpeechRequest
-from stella.api.models.responses import StandardResponse
+from stella.api.models import SpeechRequest, SpeechResponse, APIBaseResponse
 from stella.api.services.speech import SpeechService
 
-def create_speech_router(websocket_manager) -> APIRouter:
+def create_speech_router() -> APIRouter:
     """
-    Cria router de processamento de voz com dependência do WebSocketManager
-    
-    Args:
-        websocket_manager: Instância do WebSocketManager
-        
-    Returns:
-        APIRouter configurado para processamento de voz
+    Cria API router de processamento de voz
     """
     router = APIRouter(prefix="/speech", tags=["Processamento de Voz"])
-    speech_service = SpeechService(websocket_manager)
     
-    @router.post("/process", response_model=StandardResponse)
+    @router.post("/process", response_model=APIBaseResponse)
     async def process_speech(request: SpeechRequest):
         """
-        Processa entrada de voz usando IA com contexto de sessão
+        Processa entrada de voz usando IA com contexto de sessão, assíncronamente envia resultado via WebSocket e retorna confirmação imediata
         
         Args:
-            request: Dados da solicitação (session_id, text)
+            request: Dados da Request
             
         Returns:
-            StandardResponse com resultado do processamento
+            APIBaseResponse com resultado do processamento
         """
+
         try:
             logger.info(f"🗣️ Processando fala para sessão: {request.session_id}")
             
             # Valida entrada
-            if not request.text.strip():
+            if not request.data.text.strip():
                 raise HTTPException(
                     status_code=400,
                     detail="Texto não pode estar vazio"
                 )
             
-            if len(request.text) > 1000:  # Limite de segurança
+            if len(request.data.text) > 250:
                 raise HTTPException(
                     status_code=400,
-                    detail="Texto muito longo (máximo 1000 caracteres)"
+                    detail="Texto muito longo (máximo 250 caracteres)"
                 )
             
-            # Processa a fala
-            result = speech_service.process_speech_input(
-                request.session_id,
-                request.text
+            asyncio.create_task(SpeechService.process_speech_async(request))
+
+            return APIBaseResponse(
+                status="accepted",
+                correlation_id=request.correlation_id,
+                message="Processamento de voz iniciado, resultado será enviado via WebSocket"
             )
             
-            return result
-            
-        except HTTPException:
-            raise  # Re-raise HTTP exceptions
         except Exception as e:
             logger.error(f"❌ Erro no processamento de voz: {e}")
             raise HTTPException(
