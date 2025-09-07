@@ -4,9 +4,9 @@ Assistente Inteligente para Gerenciamento de Almoxarifado com reconhecimento fac
 
 ## 📋 Visão Geral
 
-A Stella Agent é um agente de IA construído para resolver o problema de vazão de estoque e aviso tardio de estoque em baixa, evidênciado pela DASA. Consiste em um assistente de retirada de produtos do estoque, de forma resumida, a Stella (de forma natural), conversa com o funcionário para saber exatamente o que e quantas unidades ele está retirando. Após confirmação (Quando ambas as partes não tem mais dúvidas), a Stella registra essa retirada e envia para o Sistema de Unidade do hospital, o qual tem todos os logs de retirada e controle de estoque. A Stella foi construída para agilizar o trabalho do estoquista sem que ele delegue a função de controlar o Estoque. O fluxo padrão de uma retirada com a Stella seria semelhante á:
+A Stella Agent é um agente de IA construído para resolver o problema de vazão de estoque e aviso tardio de estoque em baixa, evidênciado pela DASA. Consiste em um assistente de retirada de produtos do estoque, de forma resumida, a Stella (de forma natural), conversa com o funcionário para saber exatamente o que e quantas unidades ele está retirando. Após confirmação (Quando ambas as partes não tem mais dúvidas), a Stella registra essa retirada e envia para o Sistema de Unidade do hospital, o qual tem todos os logs de retirada e controle de estoque. A Stella foi construída para agilizar o trabalho do estoquista sem que ele delegue a função de controlar o Estoque.
 
-## 🔄 Fluxo da Stella Agent
+## 🔄 Fluxo da Stella
 
 ### Diagrama de Interação
 
@@ -15,11 +15,11 @@ sequenceDiagram
     participant E as 👤 Estoquista
     participant S as 🤖 Stella
     participant F as 📸 Face ID
-    participant AI as 🧠 Gemini IA
+    participant AI as 🧠 Processamento de IA
     participant DB as 📦 Estoque
     participant U as 🏥 Sistema Unidade
 
-    Note over E,U: 🚀 Início da Interação (< 15 segundos)
+    Note over E,U: ⏳ Tempo médio de interação: 15 segundos
     
     E->>S: 🗣️ "Hey Stella"
     S->>E: 👋 "Olá! Como posso ajudar?"
@@ -48,40 +48,39 @@ sequenceDiagram
         E->>S: 🗣️ "Tudo bem, confirmo"
     end
     
-    S->>E: ✅ "Registrei 5 seringas 10ml. Gaveta B."
+    S->>E: ✅ "Registrei 5 seringas 10ml."
     S->>DB: 📝 Atualiza estoque (50→45)
     S->>U: 📤 Envia log de retirada
     
     Note over E,U: ✨ Interação completa!
 ```
 
-### Fluxo Visual Simplificado
+###  Jornada de uma retirada
 
-```
-🚪 Entrada no Almoxarifado
-    ↓
-🗣️ "Hey Stella"
-    ↓
-👋 Stella liga e cumprimenta
-    ↓
-🔐 Autenticação facial (se necessário)
-    ↓
-💬 Conversa sobre itens necessários
-    ↓ 
-🧠 IA analisa e verifica estoque
-    ↓
-⚠️ Alerta de estoque crítico (se aplicável)
-    ↓
-✅ Confirmação final
-    ↓
-📝 Registro da retirada
-    ↓
-📤 Envio para Sistema da Unidade
-    ↓
-🎯 Missão completa (< 15 segundos)
+```mermaid
+journey
+    title Jornada do Estoquista com Stella
+    section Entrada
+      Chega no almoxarifado: 5: Estoquista
+      Fala "Hey Stella": 5: Estoquista
+      Stella responde: 5: Stella
+    section Autenticação
+      Olha para câmera: 4: Estoquista
+      Face ID processa: 3: Sistema
+      Acesso liberado: 5: Stella
+    section Conversa
+      Pede itens: 5: Estoquista
+      IA analisa pedido: 4: Stella
+      Esclarece dúvidas: 4: Ambos
+      Confirma retirada: 5: Ambos
+    section Finalização
+      Registra no estoque: 5: Stella
+      Envia para Unidade: 5: Stella
+      Despede-se: 5: Stella
 ```
 
-### Estados da Stella
+
+### Fluxo de Estado da Stella
 
 ```mermaid
 stateDiagram-v2
@@ -110,70 +109,6 @@ stateDiagram-v2
     Escutando --> [*] : Timeout (3 min)
 ```
 
-## 🔌 Arquitetura de Comunicação
-
-### API + WebSocket Flow
-
-```mermaid
-graph TB
-    subgraph "🖥️ Frontend"
-        UI[Interface Stella]
-        WS[WebSocket Client]
-    end
-    
-    subgraph "🚀 Backend API"
-        HTTP[HTTP Endpoints]
-        WSM[WebSocket Manager]
-        SVC[Services Layer]
-    end
-    
-    subgraph "🧠 Processamento"
-        AI[Gemini IA]
-        FACE[Face Recognition]
-        SPEECH[Speech Processor]
-    end
-    
-    subgraph "💾 Dados"
-        STOCK[stock.json]
-        FACES[faces.json]
-    end
-    
-    subgraph "🏥 Externa"
-        UNIT[Sistema Unidade]
-        PUSHER[Pusher WebSocket]
-    end
-    
-    UI -->|POST request| HTTP
-    HTTP -->|Immediate response| UI
-    HTTP -->|Async task| SVC
-    
-    SVC -->|Process| AI
-    SVC -->|Recognize| FACE
-    SVC -->|Interpret| SPEECH
-    
-    AI -->|Query| STOCK
-    FACE -->|Read| FACES
-    
-    SVC -->|Result| WSM
-    WSM -->|Real-time| PUSHER
-    PUSHER -->|Event| WS
-    WS -->|Update| UI
-    
-    SVC -->|Log| UNIT
-    
-    classDef frontend fill:#e1f5fe
-    classDef backend fill:#f3e5f5
-    classDef ai fill:#fff3e0
-    classDef data fill:#e8f5e8
-    classDef external fill:#ffebee
-    
-    class UI,WS frontend
-    class HTTP,WSM,SVC backend
-    class AI,FACE,SPEECH ai
-    class STOCK,FACES data
-    class UNIT,PUSHER external
-```
-
 ## ⚡ Tempos de Resposta
 
 | Ação | Tempo Esperado | Método |
@@ -184,31 +119,6 @@ graph TB
 | 📝 **Registro no estoque** | ~100ms | Background |
 | 📤 **Envio para Unidade** | ~200ms | Background |
 | ⏱️ **Total da interação** | **< 15s** | **Objetivo** |
-
-## 🎯 Fluxo de Estados da Sessão
-
-```mermaid
-journey
-    title Jornada do Estoquista com Stella
-    section Entrada
-      Chega no almoxarifado: 5: Estoquista
-      Fala "Hey Stella": 5: Estoquista
-      Stella responde: 5: Stella
-    section Autenticação
-      Olha para câmera: 4: Estoquista
-      Face ID processa: 3: Sistema
-      Acesso liberado: 5: Stella
-    section Conversa
-      Pede itens: 5: Estoquista
-      IA analisa pedido: 4: Stella
-      Esclarece dúvidas: 4: Ambos
-      Confirma retirada: 5: Ambos
-    section Finalização
-      Registra no estoque: 5: Stella
-      Envia para Unidade: 5: Stella
-      Despede-se: 5: Stella
-```
-
 
 ## 🏗️ Estrutura do Projeto
 
