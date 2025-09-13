@@ -51,7 +51,6 @@ pip list
 ```
 
 Deve mostrar algo assim:
-- ✅ `mediapipe` (0.10.21)
 - ✅ `opencv-contrib-python` (4.11.0.86)
 - ✅ `numpy` (1.26.4)
 - ✅ `python-dotenv` - Variáveis de ambiente
@@ -73,78 +72,73 @@ Caso sua nova dependência não seja compatível com as versões existentes, voc
 
 O agente Stella utiliza a API do Google Gemini para processamento de linguagem natural. Para obter sua chave gratuita, siga os passos abaixo:
 
-### 1. Obter a Chave API do Gemini
+## Obtenção de variáveis de ambiente
 
-1. **Acesse o Google AI Studio:**
+### 1.1 Obter a Chave API do Gemini
+
+- **Acesse o Google AI Studio:**
    - Vá para: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
-2. **Faça login com sua Conta Google**
+- **Faça login com sua Conta Google**
    - Use qualquer conta Google (Gmail, workspace, etc.)
 
-3. **Crie uma nova API Key:**
+- **Crie uma nova API Key:**
    - Clique em **"Create API Key"** (Criar chave de API)
    - Selecione **"Create API key in new project"** se for sua primeira vez
    - Ou escolha um projeto existente se já tiver um
 
-4. **Copie a chave gerada:**
+- **Copie a chave gerada:**
    - A chave aparecerá no formato: `AIzaSyC...` (cerca de 39 caracteres)
-   - ⚠️ **IMPORTANTE:** Copie imediatamente e guarde em local seguro
-   - Por segurança, a chave completa só é mostrada uma vez
 
-### 2. Configurar a Chave no Projeto
-
-1. **Crie o arquivo de ambiente:**
-   - Na **raiz do projeto** `stella-agent/`, crie um arquivo chamado `GEMINI_API_KEY.env`
-
-2. **Adicione sua chave no arquivo:**
-   ```env
-   GEMINI_API_KEY=AIzaSyC...SuaChaveAqui
-   ```
-   - Substitua `AIzaSyC...SuaChaveAqui` pela sua chave real
-   - **Não** coloque aspas ou espaços extras
-
-3. **Estrutura final do projeto:**
-   ```
-   stella-agent/
-   ├── GEMINI_API_KEY.env  ← Arquivo criado
-   ├── requirements.txt
-   ├── README.md
-   ├── stella/
-   └── ...
-   ```
-
-### 3. Verificar a Configuração
-
-1. **Execute o agente para testar:**
-   ```bash
-   python stella/agent/speech_processor.py
-   ```
-
-2. **Mensagens esperadas:**
-   - ✅ `GEMINI_API_KEY carregada com sucesso.`
-   - Se der erro, verifique se:
-     - O arquivo está na raiz do projeto
-     - A chave está correta (sem espaços/aspas extras)
-     - Você tem internet ativa
-
-### 4. Limites do Plano Gratuito
-
-- **15 requisições por minuto**
-- **1.500 requisições por dia**
-- **1 milhão de tokens por dia**
-
-Para uso normal do agente Stella, esses limites são mais que suficientes.
-
-### 5. Troubleshooting
-
-**Erro: "GEMINI_API_KEY não encontrada"**
-- Verifique se o arquivo `GEMINI_API_KEY.env` está na raiz do projeto
-- Confirme se o nome da variável está exatamente como: `GEMINI_API_KEY=`
-
+- **Possíveis erros:**
 **Erro: "API Key inválida"**
 - Verifique se copiou a chave completa
 - Teste criando uma nova chave no Google AI Studio
 
 **Erro: "Quota exceeded"**
 - Você excedeu o limite gratuito
-- Aguarde o reset (24h) ou considere upgrade para plano pago
+- Aguarde o reset (24h), pegue a API key do amiguinho ou considere upgrade para plano pago
+
+### 1.2 Obter a URL do CloudAMQP
+
+- **Caso você seja do time Stellar**:
+   - Peça a URL para alguém do time
+
+- **Caso não seja**:
+   - Adicionar passo a passo no final
+
+### 1.3 Obter informações do Pusher
+
+- **Caso você seja do time Stellar**:
+   - Peça a URL para alguém do time
+
+- **Caso não seja**:
+   - Adicionar passo a passo no final
+
+## Configurar as Chaves no Projeto
+
+1. **Crie o arquivo de ambiente:**
+   - Na **raiz do projeto** `stella-agent/`, crie um arquivo chamado `.env`
+
+2. **Adicione suas chaves no arquivo:**
+   ```env
+   CLOUDAMQP_URL=amqps://url-aqui
+   GEMINI_API_KEY=AIzaSyC...SuaChaveAqui
+   PUSHER_APP_ID=204...AppIdAqui
+   PUSHER_KEY=6e1456...KeyAqui
+   PUSHER_SECRET=0edc812bb...SecretAqui
+   PUSHER_CLUSTER=ClusterAqui
+   ```
+   - Substitua as variáveis pela suas chaves reais
+   - **Não** coloque aspas ou espaços extras
+
+3. **Estrutura final do projeto:**
+   ```
+   stella-agent/
+   ├── .env     ← Arquivo criado
+   ├── requirements.txt
+   ├── README.md
+   ├── stella/
+   └── ...
+   ```
+

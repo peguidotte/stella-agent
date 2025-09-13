@@ -12,6 +12,7 @@ class UserIntentions(str, Enum):
     withdraw_confirm = "withdraw_confirm"
     doubt = "doubt"
     stock_query = "stock_query"
+    normal = "normal"
     not_understood = "not_understood"
     error = "error"
 

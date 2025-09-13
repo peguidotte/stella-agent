@@ -19,9 +19,8 @@ class SpeechService:
         """
         try:
             logger.info(f"🗣️ Processando async | Sessão: {request.session_id} | Corr: {request.correlation_id}")
-            
-            ai_response = await asyncio.to_thread(
-                command_interpreter,
+
+            ai_response = await command_interpreter(
                 request.data.text,
                 request.session_id
             )

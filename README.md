@@ -1,4 +1,4 @@
-# 🤖 Stella Agent - DASA Challenge
+# 🤖 Stella Agent - Stellar - DASA Challenge
 
 Assistente Inteligente para Gerenciamento de Almoxarifado com reconhecimento facial, comandos de voz e integração com sistemas de unidade.
 
