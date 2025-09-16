@@ -59,7 +59,7 @@ def publish(exchange: str, routing_key: str, payload: dict) -> bool:
         channel = connection.channel()
         
         # Garante que o exchange existe
-        channel.exchange_declare(exchange=exchange, exchange_type='topic', durable=True)
+        channel.exchange_declare(exchange=exchange, exchange_type='direct', durable=True)
         
         # Publica a mensagem
         message_id = str(uuid.uuid4())

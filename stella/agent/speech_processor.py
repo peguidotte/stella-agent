@@ -135,11 +135,8 @@ async def publish_withdraw_confirm(session_id: str, items: list):
     """
     try:
         payload = {
-            "session_id": session_id,
-            "intention": "withdraw_confirm",
             "items": items,
-            "timestamp": datetime.now().isoformat(),
-            "source": "stella_agent"
+            "withdrawBy": session_id 
         }
         
         await asyncio.to_thread(publish, 'agent', 'speech.response', payload)
