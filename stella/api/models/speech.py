@@ -32,7 +32,7 @@ class StellaSpeechResponse(BaseModel):
     intention: UserIntentions = Field(..., description="Intenção interpretada do usuário")
     items: Optional[List[Dict[str, Any]]] = Field(
         default=None,
-        description="Lista de itens (ex: [{'item':'seringa_10ml','quantidade':5}])"
+        description="Lista de itens (ex: [{'productName':'seringa_10ml','quantity':5}])"
     )
     response: str = Field(..., description="Resposta natural gerada pela Stella")
     stella_analysis: StellaAnalysis = Field(default="normal", description="Classificação interna para estilização no front")
