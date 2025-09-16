@@ -5,7 +5,6 @@
 # Reconhecimento facial ---------------------------------------
 deepface==0.0.92               # Reconhecimento facial (compatível Windows)
 opencv-python>=4.5.0,<5.0.0    # Processamento de imagem
-tf_keras==2.19.0               # Interface Keras para TensorFlow
 # -------------------------------------------------------------
 
 # Configuração e ambiente -------------------------------------
@@ -36,7 +35,6 @@ spacy>=3.7.0                   # Suporte híbrido para NLP em português
 # Dependências fixas para compatibilidade ---------------------
 numpy>=1.25.2,<2.0.0          # Compatível com DeepFace e Gemini
 protobuf>=4.25.3,<5.0.0       # Compatível com ambos
-tensorflow>=2.15.0            # Backend para DeepFace
 transformers                   # Para zero-shot e NER (versão mais recente)
 torch                          # Backend para transformers (versão mais recente)
 requests                       # Para fazer requisições HTTP
