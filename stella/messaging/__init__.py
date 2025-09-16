@@ -1,9 +1,6 @@
 """
-Messaging Module - Comunicação com Sistema da Unidade
+Messaging Module - Comunication With Unity System
 
 Este módulo é responsável por:
-- Envio de notificações para o Sistema da Unidade
-- Recebimento de configurações e comandos
-- Gerenciamento de filas de mensagens
-- Payloads de sucesso e erro conforme especificado nas HUs
+- Envio e recebimento de notificações para o Sistema da Unidade
 """

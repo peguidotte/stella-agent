@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from stella.core.session_manager import SessionManager, SessionState
-from stella.voice.speech_processor import SpeechProcessor, VoiceCommand
+from stella.agent.speech_processor import SpeechProcessor, VoiceCommand
 from stella.face_id.face_recognizer import FaceRecognizer
 from stella.messaging.unit_system_client import UnitSystemClient
 from stella.config.settings import Settings

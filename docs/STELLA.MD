@@ -34,7 +34,7 @@ A **Stella** é uma assistente de voz com IA, desenvolvida em **Python**, que se
 
 1. Criar estrutura de pasta padrão:
    - `/core` – lógica principal
-   - `/voice` – ativação e escuta
+   - `/agent` – ativação e escuta
    - `/face_id` – validação facial
    - `/messaging` – integração com sistema de unidade
    - `/config` – arquivos de configuração locais
