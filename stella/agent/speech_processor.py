@@ -39,7 +39,7 @@ SYSTEM_INSTRUCTION = (
     """
     {
         "intention": "string (um de: withdraw_request, withdraw_confirm, doubt, stock_query, not_understood, normal)",
-        "items": "array (opcional, lista de: {'item': 'nome_item', 'quantidade': numero})",
+        "items": "array (opcional, lista de: {'productName': 'nome_item', 'quantity': numero})",
         "response": "string (resposta natural e amigável para o usuário)",
         "stella_analysis": "string (um de: normal, low_stock_alert, critical_stock_alert, outlier_withdraw_request, ambiguous, not_understood, farewell, greeting)",
         "reason": "string (opcional, justificativa para a análise)"
@@ -134,12 +134,16 @@ async def publish_withdraw_confirm(session_id: str, items: list):
     Publica confirmação de retirada no RabbitMQ de forma assíncrona
     """
     try:
+        
+        
         payload = {
-            "items": items,
+            "itens": items,
             "withdrawBy": session_id 
         }
         
-        await asyncio.to_thread(publish, 'agent', 'speech.response', payload)
+        logger.debug(f"Preparando para publicar confirmação de retirada | `{payload}`")
+        
+        await asyncio.to_thread(publish, 'stock', 'remove', payload)
         logger.success(f"📤 Confirmação de retirada publicada | Sessão: {session_id}")
         
     except Exception as e:
