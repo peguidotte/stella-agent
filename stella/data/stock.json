@@ -1,107 +1,51 @@
 {
   "estoque": {
-    "seringa_5ml": {
-      "nome_completo": "Seringa descartável 5ml",
+    "seringa": {
+      "nome_completo": "Seringa",
       "categoria": "material_descartavel",
-      "quantidade_atual": 150,
-      "quantidade_minima": 50,
-      "quantidade_critica": 20,
+      "quantidade_atual": 90,
+      "quantidade_minima": 100,
+      "quantidade_critica": 50,
       "outlier_maximo": 30,
       "outlier_minimo": 1,
-      "localizacao": {
-        "setor": "A",
-        "prateleira": "3",
-        "gaveta": "B"
-      },
-      "historico_medio_diario": 12,
-      "unidade": "unidade"
-    },
-    "seringa_10ml": {
-      "nome_completo": "Seringa descartável 10ml",
-      "categoria": "material_descartavel",
-      "quantidade_atual": 200,
-      "quantidade_minima": 80,
-      "quantidade_critica": 30,
-      "outlier_maximo": 40,
-      "outlier_minimo": 1,
-      "localizacao": {
-        "setor": "A",
-        "prateleira": "3",
-        "gaveta": "C"
-      },
-      "historico_medio_diario": 18,
       "unidade": "unidade"
     },
     "luva": {
-      "nome_completo": "Luva de procedimento descartável",
+      "nome_completo": "Luva",
       "categoria": "epi",
-      "quantidade_atual": 500,
-      "quantidade_minima": 100,
-      "quantidade_critica": 30,
+      "quantidade_atual": 1000,
+      "quantidade_minima": 50,
+      "quantidade_critica": 5,
       "outlier_maximo": 50,
       "outlier_minimo": 5,
-      "localizacao": {
-        "setor": "B",
-        "prateleira": "1",
-        "gaveta": "A"
-      },
-      "historico_medio_diario": 45,
       "unidade": "par"
     },
-    "mascara_n95": {
-      "nome_completo": "Máscara N95 respiratória",
+    "mascara": {
+      "nome_completo": "Máscara",
       "categoria": "epi",
-      "quantidade_atual": 25,
+      "quantidade_atual": 1000,
       "quantidade_minima": 50,
-      "quantidade_critica": 10,
+      "quantidade_critica": 5,
       "outlier_maximo": 15,
       "outlier_minimo": 1,
-      "localizacao": {
-        "setor": "C",
-        "prateleira": "2",
-        "gaveta": "C"
-      },
-      "historico_medio_diario": 8,
       "unidade": "unidade"
     },
-    "agulha_21g": {
-      "nome_completo": "Agulha descartável 21G",
-      "categoria": "material_descartavel",
-      "quantidade_atual": 300,
+    "reagente": {
+      "nome_completo": "Reagente",
+      "categoria": "material_laboratorial",
+      "quantidade_atual": 120,
       "quantidade_minima": 100,
-      "quantidade_critica": 40,
-      "outlier_maximo": 50,
-      "outlier_minimo": 1,
-      "localizacao": {
-        "setor": "A",
-        "prateleira": "2",
-        "gaveta": "A"
-      },
-      "historico_medio_diario": 25,
-      "unidade": "unidade"
-    },
-    "agulha_10g": {
-      "nome_completo": "Agulha descartável 10G",
-      "categoria": "material_descartavel",
-      "quantidade_atual": 250,
-      "quantidade_minima": 100,
-      "quantidade_critica": 40,
-      "outlier_maximo": 50,
-      "outlier_minimo": 1,
-      "localizacao": {
-        "setor": "A",
-        "prateleira": "2",
-        "gaveta": "B"
-      },
-      "historico_medio_diario": 20,
-      "unidade": "unidade"
+      "quantidade_critica": 50,
+      "outlier_maximo": 40,
+      "outlier_minimo": 3,
+      "unidade": "frasco"
     },
     "gaze": {
-      "nome_completo": "Gaze estéril 7.5x7.5cm",
+      "nome_completo": "Gaze",
       "categoria": "material_curativo",
-      "quantidade_atual": 80,
-      "quantidade_minima": 60,
-      "quantidade_critica": 20,
+      "quantidade_atual": 50,
+      "quantidade_minima": 40,
+      "quantidade_critica": 30,
       "outlier_maximo": 30,
       "outlier_minimo": 2,
       "localizacao": {
