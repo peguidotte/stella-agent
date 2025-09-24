@@ -8,6 +8,7 @@ import sys
 import time
 from typing import Dict, Optional, Any
 import asyncio
+import httpx
 from stella.messaging.publisher import publish
 
 ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
@@ -112,24 +113,59 @@ def switch_active_session(session_id: str):
                 end_session(sid)
         logger.info(f"Alternando sessão ativa de {ACTIVE_SESSION_ID} para {session_id}")
     ACTIVE_SESSION_ID = session_id
-
-def load_estoque_data():
+async def load_external_stock(base_url: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Busca estoque da API externa e retorna um dicionário indexado por nome normalizado.
+    Estrutura da API externa (GET /products):
+    [
+      {
+        "id": "string",
+        "name": "string",
+        "description": "string",
+        "quantity": 0,
+        "createdAt": "2025-09-24T04:12:55.092Z",
+        "updatedAt": "2025-09-24T04:12:55.093Z",
+        "categoryName": "string"
+      }
+    ]
+    """
+    # Permite configurar via variável de ambiente INVENTORY_API_URL
+    base = (base_url or os.environ.get("INVENTORY_API_URL") or "http://localhost:8080").rstrip('/')
+    url = base + "/products"
     try:
-        # Caminho único e absoluto para o arquivo de estoque
-        stock_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'stock.json')
-        )
-
-        if not os.path.exists(stock_path):
-            logger.error(f"Arquivo de estoque não encontrado em: {stock_path}")
-            return {"estoque": {}}
-
-        with open(stock_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            items = resp.json() or []
+            def _norm(s: str) -> str:
+                s = (s or "").strip().lower()
+                # normaliza espaços e separadores comuns
+                for ch in [" ", ",", ".", ";", ":", "/", "\\"]:
+                    s = s.replace(ch, "_")
+                while "__" in s:
+                    s = s.replace("__", "_")
+                return s.strip("_")
+            stock_map: Dict[str, Any] = {}
+            for it in items:
+                name = it.get("name") or ""
+                norm = _norm(name)
+                stock_map[norm] = {
+                    "id": it.get("id"),
+                    "name": name,
+                    "description": it.get("description"),
+                    "quantity": int(it.get("quantity", 0)),
+                    "createdAt": it.get("createdAt"),
+                    "updatedAt": it.get("updatedAt"),
+                    "categoryName": it.get("categoryName"),
+                }
+            return stock_map
+    except httpx.HTTPError as e:
+        logger.error(f"Erro ao consultar estoque externo: {e}")
+        return {}
     except Exception as e:
-        logger.error(f"Erro ao carregar dados do estoque: {e}")
-        return {"estoque": {}}
+        logger.error(f"Erro inesperado ao consultar estoque externo: {e}")
+        return {}
+    
     
 async def publish_withdraw_confirm(session_id: str, items: list):
     """
@@ -154,30 +190,19 @@ async def publish_withdraw_confirm(session_id: str, items: list):
 async def command_interpreter(comando: str, session_id: str):
     switch_active_session(session_id)
     sess = get_or_create_session(session_id)
-    estoque_data = load_estoque_data()    
-    estoque_completo = estoque_data.get('estoque', {})
+    # Carrega estoque da API externa
+    external_stock = await load_external_stock()
     
     # Formatar estoque de forma legível para a IA
     estoque_formatado = ""
-    for item_key, item_data in estoque_completo.items():
-        nome_completo = item_data.get('nome_completo', item_key)
-        quantidade_atual = item_data.get('quantidade_atual', 0)
-        quantidade_minima = item_data.get('quantidade_minima', 0)
-        quantidade_critica = item_data.get('quantidade_critica', 0)
-        unidade = item_data.get('unidade', 'unidade')
-        
-        status = "🟢 NORMAL"
-        if quantidade_atual <= quantidade_critica:
-            status = "🔴 CRÍTICO"
-        elif quantidade_atual <= quantidade_minima:
-            status = "🟡 BAIXO"
-        
-        estoque_formatado += f"""
-        • {item_key}: {nome_completo}
-        - Quantidade atual: {quantidade_atual} {unidade}
-        - Mínimo: {quantidade_minima} | Crítico: {quantidade_critica}
-        - Status: {status}
-        """
+    for norm_name, item in external_stock.items():
+        quantidade_atual = item.get('quantity', 0)
+        categoria = item.get('categoryName') or 'N/A'
+        estoque_formatado += (
+            f"\n• {norm_name}: {item.get('name')}\n"
+            f"- Quantidade atual: {quantidade_atual} unidade(s)\n"
+            f"- Categoria: {categoria}\n"
+        )
     
     prompt = f"""
         Analise este comando: "{comando}"
@@ -212,11 +237,106 @@ async def command_interpreter(comando: str, session_id: str):
             logger.warning(f"IA retornou stella_analysis inválida: {resultado.get('stella_analysis')}")
             resultado["stella_analysis"] = "not_understood"
             
+        # Pré-validação para pedidos de retirada: informa disponibilidade antes da confirmação
+        if resultado.get("intention") == "withdraw_request":
+            pedidos = resultado.get("items", [])
+            if pedidos:
+                def _norm(s: str) -> str:
+                    s = (s or "").strip().lower()
+                    for ch in [" ", ",", ".", ";", ":", "/", "\\"]:
+                        s = s.replace(ch, "_")
+                    while "__" in s:
+                        s = s.replace("__", "_")
+                    return s.strip("_")
+
+                faltantes = []
+                insuficientes = []
+                disponiveis = []
+                for it in pedidos:
+                    name = it.get("productName") or ""
+                    qty = int(it.get("quantity", 0))
+                    norm = _norm(name)
+                    stock_item = external_stock.get(norm)
+                    if not stock_item:
+                        faltantes.append(name)
+                        continue
+                    available = int(stock_item.get("quantity", 0))
+                    if qty > available:
+                        insuficientes.append({
+                            "name": name,
+                            "requested": qty,
+                            "available": available
+                        })
+                    else:
+                        disponiveis.append({
+                            "name": name,
+                            "requested": qty,
+                            "available": available
+                        })
+
+                info_msgs = []
+                if disponiveis:
+                    info_msgs.append(
+                        "Disponível: " + ", ".join([f"{d['name']} ({d['requested']}/{d['available']})" for d in disponiveis])
+                    )
+                if insuficientes:
+                    info_msgs.append(
+                        "Estoque insuficiente: " + ", ".join([f"{d['name']} (solicitado {d['requested']}, disponível {d['available']})" for d in insuficientes])
+                    )
+                if faltantes:
+                    info_msgs.append("Não encontrado(s): " + ", ".join(faltantes))
+
+                if info_msgs:
+                    complemento = " | ".join(info_msgs)
+                    resultado["stella_analysis"] = resultado.get("stella_analysis", "normal")
+                    resultado["response"] = f"{resultado.get('response', '')} (Checagem de estoque: {complemento})".strip()
+
         if resultado.get("intention") == "withdraw_confirm":
             items_confirmados = resultado.get("items", [])
             if items_confirmados:
-                await publish_withdraw_confirm(session_id, items_confirmados)
-                logger.info(f"📤 Publicação de confirmação iniciada | Sessão: {session_id}")
+                # valida itens contra estoque externo
+                def _norm(s: str) -> str:
+                    s = (s or "").strip().lower()
+                    for ch in [" ", ",", ".", ";", ":", "/", "\\"]:
+                        s = s.replace(ch, "_")
+                    while "__" in s:
+                        s = s.replace("__", "_")
+                    return s.strip("_")
+
+                faltantes = []
+                insuficientes = []
+                for it in items_confirmados:
+                    name = it.get("productName") or ""
+                    qty = int(it.get("quantity", 0))
+                    norm = _norm(name)
+                    stock_item = external_stock.get(norm)
+                    if not stock_item:
+                        faltantes.append(name)
+                        continue
+                    if qty > int(stock_item.get("quantity", 0)):
+                        insuficientes.append({
+                            "name": name,
+                            "requested": qty,
+                            "available": int(stock_item.get("quantity", 0))
+                        })
+
+                if faltantes or insuficientes:
+                    # Não publica e orienta usuário
+                    msg_parts = []
+                    if faltantes:
+                        msg_parts.append(f"Itens não encontrados: {', '.join(faltantes)}")
+                    if insuficientes:
+                        det = ", ".join([f"{d['name']} (solicitado {d['requested']}, disponível {d['available']})" for d in insuficientes])
+                        msg_parts.append(f"Itens com estoque insuficiente: {det}")
+                    resultado["intention"] = "doubt"
+                    resultado["stella_analysis"] = "ambiguous"
+                    resultado["response"] = (
+                        "Não consegui confirmar a retirada. " + "; ".join(msg_parts) + 
+                        ". Deseja ajustar a quantidade ou escolher outro item?"
+                    )
+                else:
+                    await publish_withdraw_confirm(session_id, items_confirmados)
+                    logger.info(f"📤 Publicação de confirmação iniciada | Sessão: {session_id}")
         
         logger.success(f"SessionID: {session_id} - Comando interpretado: {resultado.get('intention', 'N/A')}")
         return resultado
