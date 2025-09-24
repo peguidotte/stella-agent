@@ -38,6 +38,7 @@ protobuf>=4.25.3,<5.0.0       # Compatível com ambos
 transformers                   # Para zero-shot e NER (versão mais recente)
 torch                          # Backend para transformers (versão mais recente)
 requests                       # Para fazer requisições HTTP
+httpx>=0.27.0                  # Cliente HTTP async para integrar API externa de estoque
 python-multipart
 # -------------------------------------------------------------
 
