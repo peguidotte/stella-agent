@@ -8,9 +8,18 @@ Gerencia todas as configurações da aplicação incluindo:
 """
 
 import os
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 import yaml
 from pathlib import Path
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+ENV_PATH = BASE_DIR / '.env'
+if ENV_PATH.exists():
+    load_dotenv(dotenv_path=ENV_PATH)
+else:  # pragma: no cover - fallback quando .env não existe
+    load_dotenv()
 
 
 class Settings:
@@ -26,6 +35,56 @@ class Settings:
         self.config_file = Path(__file__).parent / config_file
         self._settings = self._load_default_settings()
         self._load_from_file()
+        self._load_env_settings()
+
+    # --- Environment helpers -------------------------------------------------
+
+    @staticmethod
+    def _get_bool_env(name: str, default: bool = False) -> bool:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return value.strip().lower() in {"1", "true", "t", "yes", "y"}
+
+    @staticmethod
+    def _get_int_env(name: str, default: int) -> int:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _load_env_settings(self) -> None:
+        """Carrega configurações provenientes de variáveis de ambiente."""
+        self.mock_gemini: bool = self._get_bool_env('MOCK_GEMINI', False)
+        self.mock_database: bool = self._get_bool_env('MOCK_DATABASE', False)
+        self.inventory_api_url: str = os.getenv('INVENTORY_API_URL', 'http://localhost:8080')
+        self.gemini_api_key: Optional[str] = os.getenv('GEMINI_API_KEY')
+        self.gemini_model_id: str = os.getenv('GEMINI_MODEL_ID', 'gemini-2.5-flash')
+        self.session_ttl_seconds: int = self._get_int_env('SESSION_TTL_SECONDS', 3 * 60)
+        self.low_stock_threshold: int = self._get_int_env('STELLA_LOW_STOCK_THRESHOLD', 20)
+        self.critical_stock_threshold: int = self._get_int_env('STELLA_CRITICAL_STOCK_THRESHOLD', 5)
+        self.cloudamqp_url: Optional[str] = os.getenv('CLOUDAMQP_URL')
+        self.pusher_app_id: Optional[str] = os.getenv('PUSHER_APP_ID')
+        self.pusher_key: Optional[str] = os.getenv('PUSHER_KEY')
+        self.pusher_secret: Optional[str] = os.getenv('PUSHER_SECRET')
+        self.pusher_cluster: str = os.getenv('PUSHER_CLUSTER', 'us2')
+        self.pusher_channel: str = os.getenv('STELLA_CHANNEL', 'private-agent-123')
+
+    def pusher_credentials(self) -> Dict[str, Optional[str]]:
+        """Retorna credenciais configuradas do Pusher."""
+        return {
+            'PUSHER_APP_ID': self.pusher_app_id,
+            'PUSHER_KEY': self.pusher_key,
+            'PUSHER_SECRET': self.pusher_secret,
+            'PUSHER_CLUSTER': self.pusher_cluster,
+        }
+
+    def missing_pusher_credentials(self) -> list[str]:
+        """Lista as variáveis obrigatórias do Pusher que não foram configuradas."""
+        return [key for key, value in self.pusher_credentials().items() if not value]
     
     def _load_default_settings(self) -> Dict[str, Any]:
         """Carrega configurações padrão"""
@@ -161,3 +220,6 @@ class Settings:
         
         self.set('authentication.default_pin', value)
         self.save()
+
+
+settings = Settings()

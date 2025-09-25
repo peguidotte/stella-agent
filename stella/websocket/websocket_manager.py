@@ -1,24 +1,21 @@
-"""
-Módulo de WebSocket usando Pusher para comunicação em tempo real com Front End.
-Funções utilitárias para envio de eventos e autenticação.
-"""
+"""Integração com Pusher para comunicação em tempo real do Stella Agent."""
 
-import os
-import pusher
-from datetime import datetime
-from typing import Dict, Any
-from dotenv import load_dotenv
-from loguru import logger
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict
 
-# Carrega variáveis de ambiente
-ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-load_dotenv(dotenv_path=ENV_PATH)
+import pusher
+from loguru import logger
 
-def require_pusher_env():
-    """Garante que todas as variáveis do Pusher existam; encerra o processo se faltar algo."""
-    required = ['PUSHER_APP_ID', 'PUSHER_KEY', 'PUSHER_SECRET', 'PUSHER_CLUSTER']
-    missing = [k for k in required if not os.environ.get(k)]
+from stella.config.settings import settings
+
+ENV_PATH = Path(__file__).resolve().parents[2] / '.env'
+
+
+def require_pusher_env() -> None:
+    """Valida se as credenciais obrigatórias do Pusher estão configuradas."""
+    missing = settings.missing_pusher_credentials()
     if missing:
         logger.error(
             "Variáveis de ambiente do Pusher ausentes: {}. "
@@ -33,15 +30,15 @@ require_pusher_env()
 
 # Cliente Pusher global (singleton)
 _pusher_client = pusher.Pusher(
-    app_id=os.environ.get('PUSHER_APP_ID'),
-    key=os.environ.get('PUSHER_KEY'),
-    secret=os.environ.get('PUSHER_SECRET'),
-    cluster=os.environ.get('PUSHER_CLUSTER'),
-    ssl=True
+    app_id=settings.pusher_app_id,
+    key=settings.pusher_key,
+    secret=settings.pusher_secret,
+    cluster=settings.pusher_cluster,
+    ssl=True,
 )
 
 # Canal padrão
-DEFAULT_CHANNEL = os.environ.get('STELLA_CHANNEL', 'private-agent-123')
+DEFAULT_CHANNEL = settings.pusher_channel
 logger.info(f"📡 Canal padrão configurado: {DEFAULT_CHANNEL}")
 
 def send_event(channel: str, event: str, data: Dict[str, Any]) -> None:

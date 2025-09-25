@@ -1,14 +1,10 @@
-import os
 import json
 import signal
 import sys
 import pika
-from dotenv import load_dotenv
 from loguru import logger
 
-# Carrega .env da raiz do repo
-ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-load_dotenv(dotenv_path=ENV_PATH)
+from stella.config.settings import settings
 
 def get_rabbitmq_connection():
     """
@@ -20,10 +16,10 @@ def get_rabbitmq_connection():
     Raises:
         RuntimeError: Se CLOUDAMQP_URL não estiver configurada ou conexão falhar
     """
-    amqp_url = os.environ.get('CLOUDAMQP_URL')
+    amqp_url = settings.cloudamqp_url
     if not amqp_url:
-        logger.error("❌ CLOUDAMQP_URL não encontrada no .env")
-        raise RuntimeError("CLOUDAMQP_URL não encontrada no .env")
+        logger.error("❌ CLOUDAMQP_URL não configurada. Defina-a no ambiente ou .env")
+        raise RuntimeError("CLOUDAMQP_URL não configurada")
     
     try:
         params = pika.URLParameters(amqp_url)
@@ -68,7 +64,7 @@ def process_message(ch, method, properties, body):
         logger.error(f"❌ Erro ao processar mensagem: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
-def start_consumer(exchange: str, queue_name: str):
+def start_consumer(exchange: str = 'stock', queue_name: str = 'stock.remove'):
     """
     Inicia o consumer RabbitMQ.
     
