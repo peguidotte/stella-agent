@@ -1,4 +1,9 @@
-"""Integração com Pusher para comunicação em tempo real do Stella Agent."""
+"""
+Integração com Pusher para comunicação em tempo real do Stella Agent.
+
+Este módulo fornece funções para envio de eventos via Pusher e autenticação de canais privados,
+incluindo serialização de dados e validação de credenciais de ambiente.
+"""
 
 import sys
 from datetime import datetime

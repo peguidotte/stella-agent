@@ -52,9 +52,9 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "description": "Sistema de Assistente Virtual com IA",
-    "pusher_cluster": settings.pusher_cluster,
+        "pusher_cluster": settings.pusher_cluster,
         "endpoints": {
-            "docs": "/docs",
+        "docs": "/docs",
             "auth": "/auth/pusher",
             "session_start": "/session/start",
             "session_end": "/session/end",

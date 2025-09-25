@@ -8,14 +8,14 @@ Gerencia todas as configurações da aplicação incluindo:
 """
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-ENV_PATH = BASE_DIR / '.env'
+STELLA_DIR = Path(__file__).resolve().parents[2]
+ENV_PATH = STELLA_DIR / '.env'
 if ENV_PATH.exists():
     load_dotenv(dotenv_path=ENV_PATH)
 else:  # pragma: no cover - fallback quando .env não existe
@@ -82,7 +82,7 @@ class Settings:
             'PUSHER_CLUSTER': self.pusher_cluster,
         }
 
-    def missing_pusher_credentials(self) -> list[str]:
+    def missing_pusher_credentials(self) -> List[str]:
         """Lista as variáveis obrigatórias do Pusher que não foram configuradas."""
         return [key for key, value in self.pusher_credentials().items() if not value]
     
