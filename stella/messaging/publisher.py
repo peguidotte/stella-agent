@@ -1,14 +1,10 @@
-import os
 import json
 import uuid
 import pika
 from datetime import datetime
-from dotenv import load_dotenv
 from loguru import logger
 
-# Carrega .env da raiz do repo
-ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-load_dotenv(dotenv_path=ENV_PATH)
+from stella.config.settings import settings
 
 def get_rabbitmq_connection():
     """
@@ -20,10 +16,10 @@ def get_rabbitmq_connection():
     Raises:
         RuntimeError: Se CLOUDAMQP_URL não estiver configurada ou conexão falhar
     """
-    amqp_url = os.environ.get('CLOUDAMQP_URL')
+    amqp_url = settings.cloudamqp_url
     if not amqp_url:
-        logger.error("❌ CLOUDAMQP_URL não encontrada no .env")
-        raise RuntimeError("CLOUDAMQP_URL não encontrada no .env")
+        logger.error("❌ CLOUDAMQP_URL não configurada. Defina-a no ambiente ou .env")
+        raise RuntimeError("CLOUDAMQP_URL não configurada")
     
     try:
         params = pika.URLParameters(amqp_url)

@@ -5,7 +5,6 @@ Servidor principal FastAPI com arquitetura organizada
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-import os
 from datetime import datetime
 
 from stella.api.routes import (
@@ -14,6 +13,7 @@ from stella.api.routes import (
     create_face_router,
     create_session_router
 )
+from stella.config.settings import settings
 
 # Configuração da aplicação FastAPI
 app = FastAPI(
@@ -52,9 +52,9 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "description": "Sistema de Assistente Virtual com IA",
-        "pusher_cluster": os.getenv('PUSHER_CLUSTER', 'us2'),
+        "pusher_cluster": settings.pusher_cluster,
         "endpoints": {
-            "docs": "/docs",
+        "docs": "/docs",
             "auth": "/auth/pusher",
             "session_start": "/session/start",
             "session_end": "/session/end",
