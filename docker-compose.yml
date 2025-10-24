@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  stella-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stella-agent
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    volumes:
+      # Mount source code for development (remove in production)
+      - ./stella:/app/stella
+      - ./main.py:/app/main.py
+      # Persist data
+      - stella-data:/app/stella/data
+      - stella-faces:/app/stella/face_id
+    restart: unless-stopped
+    networks:
+      - stella-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add RabbitMQ for local development
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   container_name: stella-rabbitmq
+  #   ports:
+  #     - "5672:5672"
+  #     - "15672:15672"
+  #   environment:
+  #     RABBITMQ_DEFAULT_USER: guest
+  #     RABBITMQ_DEFAULT_PASS: guest
+  #   volumes:
+  #     - rabbitmq-data:/var/lib/rabbitmq
+  #   networks:
+  #     - stella-network
+  #   healthcheck:
+  #     test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+networks:
+  stella-network:
+    driver: bridge
+
+volumes:
+  stella-data:
+    driver: local
+  stella-faces:
+    driver: local
+  # rabbitmq-data:
+  #   driver: local
