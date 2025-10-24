@@ -1,0 +1,45 @@
+# ==============================================================================
+# STELLA AGENT - Dependências de Desenvolvimento
+# ==============================================================================
+#
+# Instale com: pip install -r requirements-dev.txt
+# ==============================================================================
+
+# Code Quality & Formatting ------------------------------------------------
+black>=24.0.0                  # Formatador de código Python
+flake8>=7.0.0                  # Linter para Python
+flake8-docstrings>=1.7.0       # Validação de docstrings
+flake8-bugbear>=24.0.0         # Detecção de bugs comuns
+isort>=5.13.0                  # Organização de imports
+mypy>=1.8.0                    # Type checking estático
+# --------------------------------------------------------------------------
+
+# Testing ------------------------------------------------------------------
+pytest>=8.4.1                  # Framework de testes
+pytest-cov>=4.1.0              # Cobertura de código
+pytest-asyncio>=0.23.0         # Suporte para testes async
+pytest-mock>=3.12.0            # Mocking para testes
+httpx>=0.27.0                  # Cliente HTTP para testes de API
+# --------------------------------------------------------------------------
+
+# Pre-commit Hooks ---------------------------------------------------------
+pre-commit>=3.6.0              # Framework de pre-commit hooks
+# --------------------------------------------------------------------------
+
+# Documentation ------------------------------------------------------------
+sphinx>=7.2.0                  # Gerador de documentação
+sphinx-rtd-theme>=2.0.0        # Tema Read the Docs
+sphinx-autodoc-typehints>=1.25.0  # Type hints na documentação
+# --------------------------------------------------------------------------
+
+# Development Tools --------------------------------------------------------
+ipython>=8.20.0                # Shell Python interativo melhorado
+ipdb>=0.13.13                  # Debugger interativo
+# --------------------------------------------------------------------------
+
+# ==============================================================================
+# Notas:
+# - Estas dependências são apenas para desenvolvimento
+# - Não são necessárias para rodar a aplicação em produção
+# - Para instalar tudo: pip install -r requirements.txt -r requirements-dev.txt
+# ==============================================================================

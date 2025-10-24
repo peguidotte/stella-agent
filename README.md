@@ -1,6 +1,13 @@
 # 🤖 Stella Agent - Stellar - DASA Challenge
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Assistente Inteligente para Gerenciamento de Almoxarifado com reconhecimento facial, comandos de voz e integração com sistemas de unidade.
+
+**[📋 Documentação](#-visão-geral)** | **[🚀 Instalação](INSTALLATION_GUIDE.md)** | **[🤝 Contribuir](CONTRIBUTING.md)** | **[📡 API Docs](ASYNC_RESPONSES.md)**
 
 ## 📋 Visão Geral
 
@@ -152,6 +159,83 @@ main.py                # Inicializar aplicação
 ```
 
 ## 🚀 Setup e Instalação
-Visite o arquivo INSTALLATION_GUIDE.md
 
-Este projeto é parte do DASA Challenge - FIAP 2025.
+📚 **[Guia Completo de Instalação](INSTALLATION_GUIDE.md)**
+
+### Quick Start
+
+```bash
+# Clone o repositório
+git clone https://github.com/peguidotte/stella-agent.git
+cd stella-agent
+
+# Crie e ative o ambiente virtual
+python -m venv venv
+source venv/bin/activate  # No Windows: .\venv\Scripts\activate
+
+# Instale as dependências
+pip install -r requirements.txt
+
+# Configure as variáveis de ambiente
+cp .env.example .env
+# Edite o .env com suas credenciais
+
+# Inicie o servidor
+python main.py
+```
+
+Acesse a documentação da API em: http://localhost:8000/docs
+
+## 🧪 Testes
+
+```bash
+# Instalar dependências de desenvolvimento
+pip install -r requirements-dev.txt
+
+# Executar testes
+pytest
+
+# Com cobertura
+pytest --cov=stella --cov-report=html
+```
+
+## 📚 Documentação
+
+- **[Installation Guide](INSTALLATION_GUIDE.md)** - Guia detalhado de instalação
+- **[Async Responses](ASYNC_RESPONSES.md)** - Documentação de eventos WebSocket
+- **[Contributing](CONTRIBUTING.md)** - Guia para contribuidores
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** - Código de conduta
+- **[Security](SECURITY.md)** - Política de segurança
+- **[Changelog](CHANGELOG.md)** - Histórico de mudanças
+
+## 🤝 Como Contribuir
+
+Contribuições são bem-vindas! Por favor:
+
+1. Leia o [CONTRIBUTING.md](CONTRIBUTING.md)
+2. Fork o projeto
+3. Crie sua feature branch (`git checkout -b feature/AmazingFeature`)
+4. Commit suas mudanças (`git commit -m 'feat: add amazing feature'`)
+5. Push para a branch (`git push origin feature/AmazingFeature`)
+6. Abra um Pull Request
+
+## 📝 Licença
+
+Este projeto está licenciado sob a MIT License - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 👥 Time Stellar
+
+Este projeto é parte do **DASA Challenge - FIAP 2025**.
+
+Desenvolvido com ❤️ pela equipe Stellar.
+
+## 🔗 Links Úteis
+
+- [Documentação da API](http://localhost:8000/docs)
+- [ReDoc](http://localhost:8000/redoc)
+- [Issues](https://github.com/peguidotte/stella-agent/issues)
+- [Pull Requests](https://github.com/peguidotte/stella-agent/pulls)
+
+---
+
+**⭐ Se este projeto foi útil para você, considere dar uma estrela no GitHub!**
